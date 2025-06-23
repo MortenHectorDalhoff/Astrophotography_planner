@@ -1,0 +1,14 @@
+location_name: "Copenhagen, Denmark"
+calendar_year: 2025
+min_altitude_deg: 0
+max_altitude_deg: 90
+moon_sep_deg: 30
+max_moon_illum: 0.5
+min_minutes_observable: 180
+targets: [
+  'M81',
+  'M42',
+  'M45'
+]
+make_ics: False
+make_calendar: True

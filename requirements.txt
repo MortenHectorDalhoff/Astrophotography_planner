@@ -1,0 +1,9 @@
+pandas
+astroplan
+astropy
+geopy
+timezonefinder
+pyyaml
+astroquery
+ics
+matplotlib
