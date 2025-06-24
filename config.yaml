@@ -8,7 +8,14 @@ min_minutes_observable: 180
 targets: [
   'M81',
   'M42',
-  'M45'
+  'M45',
+  'Lagoon Nebula',
+  'Rosette Nebula',
+  'NGC 1499',
+  'Horsehead Nebula',
+  'M44',
+  'M33',
+  'Leo Triplet'
 ]
-make_ics: False
+make_ics: True
 make_calendar: True

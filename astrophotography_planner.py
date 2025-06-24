@@ -79,9 +79,13 @@ def get_targets(config):
             continue
         
         main_id = result['main_id'][0].decode('utf-8') if isinstance(result['main_id'][0], bytes) else result['main_id'][0]
-        main_id = re.sub(r'\s+', ' ', main_id).strip() # Clean multiple white spaces
+        main_id = re.sub(r'\s+', ' ', main_id).strip().replace('NAME ', '') # Clean multiple white spaces        
         alias = get_pretty_name_from_ids(result['ids'][0], main_id)
-        name = f"{main_id} [{alias}]"
+        
+        if main_id != alias:
+            name = f"{alias} [{main_id}]"
+        else:
+            name = main_id
 
         ra = result['ra'][0] * u.deg
         dec = result['dec'][0] * u.deg
@@ -99,8 +103,7 @@ def get_targets(config):
         sign = '+' if deg >= 0 else '-'
         dec_str = f"{sign}{abs(deg):.0f}° {abs(arcmin):.0f}' {abs(arcsec):.2f}\""
 
-        print(f"Simbad Name: {main_id}")
-        print(f"Alias: {alias}")
+        print(f"Name: {name}")
         print(f"RA: {ra_str}")
         print(f"Dec: {dec_str}\n")
 
@@ -117,12 +120,7 @@ def get_pretty_name_from_ids(ids_string, main_id):
     if name_aliases:
         return name_aliases[0]
     
-    return ""  # No pretty name found
-
-    for alias in aliases:
-        if alias.startswith('NAME '):
-            return alias.replace('NAME ', '')  # Strip the prefix
-    return ""  # No pretty name found
+    return main_id  # No pretty name found
 
 def make_ics(results):
     df = pd.DataFrame(results)
@@ -217,8 +215,7 @@ def main():
 
     # Observation date
     start_date = datetime.date(config['calendar_year'], 1, 1)
-    #end_date = datetime.date(config['calendar_year'], 12, 31)
-    end_date = datetime.date(config['calendar_year'], 3, 31)
+    end_date = datetime.date(config['calendar_year'], 12, 31)
     delta = (end_date - start_date).days + 1
     dates = [start_date + datetime.timedelta(days=i) for i in range(delta)]
 
