@@ -1,6 +1,6 @@
 location_name: "Copenhagen, Denmark"
 calendar_year: 2025
-min_altitude_deg: 0
+min_altitude_deg: 20
 max_altitude_deg: 90
 moon_sep_deg: 30
 max_moon_illum: 0.5

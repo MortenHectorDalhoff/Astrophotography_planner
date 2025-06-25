@@ -288,14 +288,6 @@ def main():
                             'observation_start': observation_start_str
                         })
 
-                    #if target_observable_minutes >= min_minutes:
-                    #    print(f"Target [{target.name}] is obserable on this night")
-                    #    results.append({
-                    #        'date': str(date),
-                    #        'target': target.name,
-                    #        'observable_hours': observable_minutes.to(u.hour).value
-                    #    })
-
         except Exception as e:
             print(e)
             continue  # skip problematic days
