@@ -7,18 +7,26 @@ from astropy.time import Time
 
 class Observer:
 
-    def __init__(self, location_name):
+    def __init__(self):
+        pass
+
+    def get_location(self, location_name=None, latitude=None, longitude=None):
         """
-        Initialize an observer at a given location by name.
 
         Parameters
         ----------
         location_name : str
             The name of the location (e.g., "New York, USA").
 
+        latitude : float, optional
+            The latitude of the observer's location in degrees. If not provided, it will be determined from the location name.
+
+        longitude : float, optional
+            The longitude of the observer's location in degrees. If not provided, it will be determined from the location name.
+
         Attributes:
         ----------
-        name : str
+        location_name : str
             The name of the observer.
 
         latitude : float
@@ -42,15 +50,39 @@ class Observer:
         Ovserver(name=New York, USA, latitude=40.7128, longitude=-74.0060, timezone=America/New_York)
         """
 
-        # Get lat and lon from name
-        loc = Nominatim(user_agent="GetLoc")
-        geo_location = loc.geocode(location_name)
-        self.latitude = geo_location.latitude
-        self.longitude = geo_location.longitude
+        # Convert Empty Strings to None
+        if isinstance(location_name, str) and location_name.strip() == "":
+            location_name = None
 
-        # Look up timezone from lat adn lon
+        if isinstance(latitude, str) and latitude.strip() == "":
+            latitude = None
+
+        if isinstance(longitude, str) and longitude.strip() == "":
+            longitude = None
+
+        self.location_name = location_name if location_name is not None else "Custom Location"
+
+        if (latitude is not None or longitude is not None):
+            print(f"Creating observer with latitude: {latitude}, longitude: {longitude}")
+            self.latitude = latitude
+            self.longitude = longitude
+
+        elif location_name is not None:
+            # Get lat and lon from name
+            print(f"Creating observer with location name: {location_name}")
+            loc = Nominatim(user_agent="GetLoc")
+            geo_location = loc.geocode(location_name)
+            self.latitude = geo_location.latitude
+            self.longitude = geo_location.longitude
+            print(f"Resolved latitude: {self.latitude}, longitude: {self.longitude}")
+
+        else:
+            raise ValueError("Invalid parameters: Either location_name or both latitude and longitude must be provided.")
+
+        # Look up timezone from lat and lon
         tz_finder = TimezoneFinder()
-        self.timezone = tz_finder.timezone_at(lat=latitude, lng=longitude)
+        self.timezone = tz_finder.timezone_at(lat=self.latitude, lng=self.longitude)
+        print(f"Resolved timezone: {self.timezone}")
 
     def __repr__(self):
         """
