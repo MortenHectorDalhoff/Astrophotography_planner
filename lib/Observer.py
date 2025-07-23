@@ -10,7 +10,7 @@ class Observer:
     def __init__(self):
         pass
 
-    def get_location(self, location_name=None, latitude=None, longitude=None):
+    def get_location(self, location_name=None, latitude=None, longitude=None, timezone=None):
         """
 
         Parameters
@@ -80,9 +80,14 @@ class Observer:
             raise ValueError("Invalid parameters: Either location_name or both latitude and longitude must be provided.")
 
         # Look up timezone from lat and lon
-        tz_finder = TimezoneFinder()
-        self.timezone = tz_finder.timezone_at(lat=self.latitude, lng=self.longitude)
-        print(f"Resolved timezone: {self.timezone}")
+        if timezone is not None:
+            self.timezone = timezone
+            print(f"Using provided timezone: {self.timezone}")
+        else:
+            print("Determining timezone from latitude and longitude...")
+            tz_finder = TimezoneFinder()
+            self.timezone = tz_finder.timezone_at(lat=self.latitude, lng=self.longitude)
+            print(f"Resolved timezone: {self.timezone}")
 
     def __repr__(self):
         """

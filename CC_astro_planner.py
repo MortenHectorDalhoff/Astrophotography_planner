@@ -1,4 +1,5 @@
 # Own import
+from lib.util.clear_outside import fetch_weather_image, open_clear_outside
 from lib.Observer import Observer
 
 # UI modules
@@ -6,12 +7,11 @@ import tkinter as tk
 from tkinter import filedialog, ttk
 from ttkthemes import ThemedStyle
 
-# For weather image
-import requests
+# Other modules
 from PIL import Image, ImageTk
-import io
-import webbrowser
 import numpy as np
+import webbrowser
+import json
 
 # Sample data
 sample_targets = [
@@ -20,8 +20,174 @@ sample_targets = [
     {"name": "NGC 2024", "ra": "05h 42m", "dec": "−01°52'"}
 ]
 
-def open_file():
-    filedialog.askopenfilename(title="Open Observation Plan")
+def open_plan_file():
+    global current_file_path
+    global observer
+    global location_entry
+    global latitude_entry
+    global longitude_entry
+    global timezone_entry
+
+    print("Opening plan file...")
+
+    file_path = current_file_path = filedialog.askopenfilename(title="Open Observation Plan",
+                                                       defaultextension=".json",
+                                                       filetypes=[("JSON files", "*.json"), ("All files", "*.*")]
+                                                       )
+    print(f"Selected file: {file_path}")
+    if file_path:
+        current_file_path = file_path
+        print(f"Current file path set to: {current_file_path}")
+
+        update_hybrid_button()
+        print("Hybrid button updated.")
+
+        with open(file_path, "r") as f:
+            data = json.load(f)
+        obs_data = data.get("Observer", {})
+        print(f"Loaded observer data: {obs_data}")
+
+        location_name = obs_data.get("location_name", "")
+        latitude = obs_data.get("latitude", None)
+        longitude = obs_data.get("longitude", None)
+        timezone = obs_data.get("timezone", "")
+
+        # Update observer object
+        observer.get_location(location_name, latitude, longitude, timezone)
+        print(f"Observer updated: {observer}")
+
+        # Update UI entry fields
+        location_entry.config(state="normal")
+        location_entry.delete(0, tk.END)
+        location_entry.insert(0, location_name)
+        print(f"Location entry updated: {location_name}")
+
+        latitude_entry.config(state="normal")
+        latitude_entry.delete(0, tk.END)
+        latitude_entry.insert(0, f"{latitude:.6f}" if latitude is not None else "")
+        latitude_entry.config(state="readonly")
+        print(f"Latitude entry updated: {latitude}")
+
+        longitude_entry.config(state="normal")
+        longitude_entry.delete(0, tk.END)
+        longitude_entry.insert(0, f"{longitude:.6f}" if longitude is not None else "")
+        longitude_entry.config(state="readonly")
+        print(f"Longitude entry updated: {longitude}")
+
+        timezone_entry.config(state="normal")
+        timezone_entry.delete(0, tk.END)
+        timezone_entry.insert(0, timezone)
+        timezone_entry.config(state="readonly")
+        print(f"Timezone entry updated: {timezone}")
+
+        # get weather images
+        print("Fetching weather images...")
+        forecast_img, logo_img = fetch_weather_image(observer.latitude, observer.longitude)
+
+        forecast_img_tk_new = ImageTk.PhotoImage(forecast_img)
+        forecast_img_label.configure(image=forecast_img_tk_new)
+        forecast_img_label.image = forecast_img_tk_new
+        print("Forecast image updated.")
+
+        logo_img_tk_new = ImageTk.PhotoImage(logo_img)
+        logo_img_label.configure(image=logo_img_tk_new)
+        logo_img_label.image = logo_img_tk_new
+        print("Logo image updated.")
+
+def save_plan_file():
+    global current_file_path
+    global observer
+
+    print("Saving plan file...")
+
+    if not current_file_path:
+        file_path = filedialog.asksaveasfilename(
+            title="Save Observation Plan",
+            defaultextension=".json",
+            filetypes=[("JSON files", "*.json"), ("All files", "*.*")]
+        )
+        if not file_path:
+            print("No file path selected. Aborting save operation.")
+            return
+        current_file_path = file_path
+        print(f"Selected file path: {file_path}")
+
+    data = {
+        "Observer": {
+            "location_name": getattr(observer, "location_name", ""),
+            "latitude": getattr(observer, "latitude", None),
+            "longitude": getattr(observer, "longitude", None),
+            "timezone": getattr(observer, "timezone", "")
+        }
+    }
+
+    with open(current_file_path, "w") as f:
+        json.dump(data, f, indent=4)
+    print(f"Plan file saved to: {current_file_path}")
+
+def new_file():
+    global current_file_path
+    global observer
+    global location_entry
+    global latitude_entry
+    global longitude_entry
+    global timezone_entry
+    global forecast_img_label
+    global logo_img_label
+
+    print("Resetting interface")
+    current_file_path = None
+    observer = Observer()
+
+    location_entry.delete(0, tk.END)
+
+    latitude_entry.config(state="normal")
+    latitude_entry.delete(0, tk.END)
+    latitude_entry.config(state="readonly")
+
+    longitude_entry.config(state="normal")
+    longitude_entry.delete(0, tk.END)
+    longitude_entry.config(state="readonly")
+
+    timezone_entry.config(state="normal")
+    timezone_entry.delete(0, tk.END)
+    timezone_entry.config(state="readonly")
+
+    print("updating weather images")
+    forecast_img_label.configure(image=black_forecast_img_tk)
+    forecast_img_label.image = black_forecast_img_tk
+
+    logo_img_label.configure(image=black_logo_img_tk)
+    logo_img_label.image = black_logo_img_tk
+
+    update_hybrid_button()
+
+def save_as_file():
+    global current_file_path
+
+    print("Saving as new file...")
+
+    file_path = filedialog.asksaveasfilename(
+        title="Save Observation Plan",
+        defaultextension=".json",
+        filetypes=[("JSON files", "*.json"), ("All files", "*.*")]
+    )
+    if not file_path:
+        print("No file path selected. Aborting save operation.")
+        return
+    current_file_path = file_path
+    print(f"Selected file path: {file_path}")
+    save_plan_file()
+    update_hybrid_button()
+
+def update_hybrid_button():
+    global current_file_path
+
+    if current_file_path:
+        filename = current_file_path.split("/")[-1]
+        hybrid_button.config(text=f"Save [{filename}]", command=save_plan_file)
+    else:
+        hybrid_button.config(text="Open Plan File", command=open_plan_file)
 
 def set_hand_cursor(event):
     event.widget.config(cursor="hand2")
@@ -31,97 +197,121 @@ def set_default_cursor(event):
 
 def on_search():
     location = location_entry.get().strip()
-    lat_text = latitude_entry.get().strip()
-    lon_text = longitude_entry.get().strip()
 
-    print(f"Searching for location: {location}, Latitude: {lat_text}, Longitude: {lon_text}")
+    if not location:
+        print("No location entered.")
+        return
 
-    try:
-        latitude = float(lat_text) if lat_text else None
-        longitude = float(lon_text) if lon_text else None
-    except ValueError:
-        latitude = None
-        longitude = None
+    print(f"Searching for location: {location})")
 
     try:
-        if latitude is not None and longitude is not None:
-            observer.get_location(latitude=latitude, longitude=longitude)
-        elif location:
-            observer.get_location(location_name=location)
-        else:
-            raise ValueError("Please provide a location name or both latitude and longitude.")
+        observer.get_location(location_name=location)
+        print(f"Observer resolved: {observer}")
 
         # Update entries with resolved values
         latitude_entry.config(state="normal")
         latitude_entry.delete(0, tk.END)
         latitude_entry.insert(0, f"{observer.latitude:.6f}")
         latitude_entry.config(state="readonly")
+        print(f"Latitude entry updated: {observer.latitude}")
 
         longitude_entry.config(state="normal")
         longitude_entry.delete(0, tk.END)
         longitude_entry.insert(0, f"{observer.longitude:.6f}")
         longitude_entry.config(state="readonly")
+        print(f"Longitude entry updated: {observer.longitude}")
 
         timezone_entry.config(state="normal")
         timezone_entry.delete(0, tk.END)
         timezone_entry.insert(0, observer.timezone)
         timezone_entry.config(state="readonly")
+        print(f"Timezone entry updated: {observer.timezone}")
 
-        location_entry.delete(0, tk.END)
-        if hasattr(observer, "location_name"):
-            location_entry.insert(0, observer.location_name)
 
+        print("Getting weather images...")
         # get weather images
         forecast_img, logo_img = fetch_weather_image(observer.latitude, observer.longitude)
+        print("Weather images fetched.")
 
         forecast_img_tk_new = ImageTk.PhotoImage(forecast_img)
         forecast_img_label.configure(image=forecast_img_tk_new)
         forecast_img_label.image = forecast_img_tk_new
+        print("Forecast image updated.")
 
         logo_img_tk_new = ImageTk.PhotoImage(logo_img)
         logo_img_label.configure(image=logo_img_tk_new)
         logo_img_label.image = logo_img_tk_new
+        print("Logo image updated.")
 
     except Exception as e:
         print(f"Error: {e}")
 
-def fetch_weather_image(latitude, longitude):
-    """
-    Fetch the weather image from Clear Outside based on latitude and longitude.
-    """
-    # cast latitude and longitude to string with 2 decimal places
-    latitude = f"{latitude:.2f}"
-    longitude = f"{longitude:.2f}"
+def show_burger_menu(event=None):
+    burger_menu.tk_popup(
+        menu_frame.winfo_rootx() + burger_button.winfo_x(),
+        menu_frame.winfo_rooty() + burger_button.winfo_y() + burger_button.winfo_height()
+    )
 
-    img_url = f"https://clearoutside.com/forecast_image_medium/{latitude}/{longitude}/forecast.png"
-    response = requests.get(img_url)
-    if response.status_code != 200:
-        print("Failed to fetch medium weather image.")
-        return None
+def show_about():
+    about_win = tk.Toplevel(root)
+    about_win.iconbitmap(r'lib\icon\icon_36x36.ico')
+    about_win.title("About")
+    about_win.configure(bg="white")
+    about_win.resizable(False, False)
 
-    img = Image.open(io.BytesIO(response.content))
-    # Left, Top, Right, Bottom
-    forecast_img = img.crop((0, 80, img.width, img.height))
-    logo_img = img.crop((550, 0, img.width, 80))
+    # Load .ico image and display at top center
+    icon_img = Image.open(r'lib\icon\icon_128x128.ico')
+    icon_img_tk = ImageTk.PhotoImage(icon_img)
+    icon_label = tk.Label(about_win, image=icon_img_tk, bg="white")
+    icon_label.image = icon_img_tk  # Keep reference
+    icon_label.pack(pady=(10, 0))
 
-    return forecast_img, logo_img
+    message = (
+        "Cosmic Curiosity Astronomical Observation Planner\n"
+        "Version 0.2.1 Beta\n\n"
+        "Developed by Morten Hector Dalhoff\n"
+        "Contact: mhd@down-to-earth-media.com\n"
+        "Weather data from clearoutside.com\n\n"
+        "License:\n"
+        "This software is open source and may be used, copied, \n"
+        "and modified for personal, academic or professional \n"
+        "purposes. Any modified versions must include attribution \n"
+        "to the original author, Morten Hector Dalhoff. Commercial \n"
+        "redistribution or sale of the software, whether original \n"
+        "or modified, is not permitted without prior written permission.\n\n"
+        "© 2025 Morten Hector Dalhoff. All rights reserved."
+    )
 
-def open_clear_outside(event, latitude=None, longitude=None):
+    tk.Label(about_win, text=message, justify="left", bg="white", font=("Arial", 10)).pack(padx=10, pady=10)
 
-    # Format lat and lon to 2 decimal places
-    latitude = f"{latitude:.2f}"
-    longitude = f"{longitude:.2f}"
+    def open_github(event):
+        webbrowser.open("https://github.com/MortenHectorDalhoff/Astrophotography_planner")
 
-    # Open the Clear Outside forecast page in a web browser
-    url = f"https://clearoutside.com/forecast/{latitude}/{longitude}"
-    webbrowser.open(url)
+    def open_clearoutside(event):
+        webbrowser.open("https://clearoutside.com")
+
+    github_label = tk.Label(about_win, text="GitHub Repository", fg="blue", cursor="hand2", bg="white",
+                            font=("Arial", 10, "underline"))
+    github_label.pack(anchor="w", padx=10)
+    github_label.bind("<Button-1>", open_github)
+
+    clearoutside_label = tk.Label(about_win, text="Weather data from clearoutside.com", fg="blue", cursor="hand2",
+                                  bg="white", font=("Arial", 10, "underline"))
+    clearoutside_label.pack(anchor="w", padx=10)
+    clearoutside_label.bind("<Button-1>", open_clearoutside)
+
+    #tk.messagebox.showinfo("About", message)
+
+def exit_app():
+    root.quit()
 
 ##############
 # Initialize #
 ##############
 
-title_font = ("Arial", 12, "bold")
+title_font = ("Arial", 16, "bold")
 observer = Observer()
+current_file_path = None
 
 ###############
 # MAIN WINDOW #
@@ -129,6 +319,7 @@ observer = Observer()
 
 # Create window
 root = tk.Tk()
+root.iconbitmap(r'lib\icon\icon_36x36.ico')
 root.configure(background = 'grey14')
 style =ThemedStyle(root)
 style.set_theme('equilux')
@@ -146,8 +337,23 @@ root.geometry("1200x800")
 # Top menu and file open
 menu_frame = ttk.Frame(root, style='Custom.TFrame')
 menu_frame.pack(fill=tk.X, padx=10, pady=5)
-(ttk.Button(menu_frame, text="☰").pack(side=tk.LEFT))
-ttk.Button(menu_frame, text="Open Plan File", command=open_file).pack(side=tk.LEFT, padx=10)
+
+# Add burger menu button
+burger_button = ttk.Button(menu_frame, text="☰", width=5, command=show_burger_menu)
+burger_button.pack(side=tk.LEFT)
+
+# Create the menu
+burger_menu = tk.Menu(root, tearoff=0)
+burger_menu.add_command(label="New", command=new_file)
+burger_menu.add_command(label="Open", command=open_plan_file)
+burger_menu.add_command(label="Save", command=save_plan_file)
+burger_menu.add_command(label="Save As", command=save_as_file)
+burger_menu.add_separator()
+burger_menu.add_command(label="About", command=show_about)
+burger_menu.add_command(label="Exit", command=exit_app)
+
+hybrid_button = ttk.Button(menu_frame, text="Open Plan File", command=open_plan_file)
+hybrid_button.pack(side=tk.LEFT, padx=10)
 
 ############
 # OBSERVER #
@@ -182,8 +388,8 @@ location_search_button.config(command=on_search)
 
 # weather information
 black_forecast_img = Image.fromarray(np.zeros((145, 672, 4), dtype=np.uint8)).convert("RGBA")
-forecast_img_tk = ImageTk.PhotoImage(black_forecast_img)
-forecast_img_label = ttk.Label(observer_frame, image=forecast_img_tk)
+black_forecast_img_tk = ImageTk.PhotoImage(black_forecast_img)
+forecast_img_label = ttk.Label(observer_frame, image=black_forecast_img_tk)
 forecast_img_label.grid(row=0, column=6, rowspan=5, padx=5, pady=2, sticky="e")
 forecast_img_label.bind(
     "<Button-1>",
@@ -193,8 +399,8 @@ forecast_img_label.bind("<Enter>", set_hand_cursor)
 forecast_img_label.bind("<Leave>", set_default_cursor)
 
 black_logo_img = Image.fromarray(np.zeros((80, 122, 4), dtype=np.uint8)).convert("RGBA")
-logo_img_tk = ImageTk.PhotoImage(black_logo_img)
-logo_img_label = ttk.Label(observer_frame, image=logo_img_tk)
+black_logo_img_tk = ImageTk.PhotoImage(black_logo_img)
+logo_img_label = ttk.Label(observer_frame, image=black_logo_img_tk)
 logo_img_label.grid(row=2, column=4, rowspan=3, padx=2, pady=2, sticky="e")
 logo_img_label.bind(
     "<Button-1>",
@@ -202,7 +408,6 @@ logo_img_label.bind(
 )
 logo_img_label.bind("<Enter>", set_hand_cursor)
 logo_img_label.bind("<Leave>", set_default_cursor)
-
 
 # Latitude and Longitude
 latitude_label = ttk.Label(observer_frame, text="Latitude:")
@@ -226,20 +431,23 @@ timezone_entry = ttk.Entry(observer_frame,)
 timezone_entry.grid(row=3, column=1, columnspan=2, sticky="ew", padx=2, pady=10)
 timezone_entry.config(state="readonly")
 
-# Add target button
-##target_frame = ttk.Frame(root)
-##target_frame.pack(fill=tk.X, padx=10, pady=10)
-##ttk.Button(target_frame, text="Add Target").pack(side=tk.LEFT)
+###########
+# TARGETS #
+###########
 
-# Display targets
-##targets_frame = ttk.Frame(root)
-##targets_frame.pack(side=tk.LEFT, padx=10)
+targets_frame = ttk.Frame(root, width=300)
+targets_frame.pack(side=tk.LEFT, padx=(10, 5), pady=5, fill=tk.Y)
+targets_frame.pack_propagate(False)  # Prevent shrinking to fit contents
 
-##for target in sample_targets:
-##    box = tk.LabelFrame(targets_frame, text=target["name"], padx=5, pady=5)
-##   box.pack(pady=5, fill=tk.X)
-##   ttk.Label(box, text=f"RA: {target['ra']}").pack(anchor="w")
-##   ttk.Label(box, text=f"DEC: {target['dec']}").pack(anchor="w")
+ttk.Label(targets_frame, text="Targets", font=title_font).pack(anchor="n", pady=5)
+
+
+############
+# CALENDAR #
+############
+
+calendar_frame = ttk.Frame(root)
+calendar_frame.pack(side=tk.LEFT, padx=(5, 10), pady=5, fill=tk.BOTH, expand=True)
 
 # Calendar
 ##calendar_frame = ttk.Frame(root)
