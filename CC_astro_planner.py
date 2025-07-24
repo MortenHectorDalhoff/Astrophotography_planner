@@ -1,6 +1,7 @@
 # Own import
 from lib.util.clear_outside import fetch_weather_image, open_clear_outside
 from lib.Observer import Observer
+from lib.AstroTarget import AstroTarget
 
 # UI modules
 import tkinter as tk
@@ -244,49 +245,121 @@ def on_search():
     except Exception as e:
         print(f"Error: {e}")
 
-def add_target(event):
-    # raise the new target frame
-    print("Adding new target")
-    new_target_frame.config(relief="raised")
+def add_target(event=None):
+    def add_target_to_main_ui(target):
+        # This function should add the target to your main UI as before,
+        # but using the AstroTarget object for info.
+        frame = ttk.Frame(targets_frame, style='target.TFrame')
+        frame.columnconfigure(2, weight=1)
 
-    target_info = {
-        "name": "Andromeda Galaxy [M31]",
-        "ra": "+00h42m44.3s",
-        "dec": "+41°16′9″"
-    }
+        def remove_target(event=None):
+            frame.destroy()
+            if frame in target_frames:
+                target_frames.remove(frame)
 
+        x_button = ttk.Label(frame, text="✕", style='target_normal.TLabel')
+        x_button.grid(row=0, column=2, sticky="ne", padx=2, pady=2)
+        x_button.bind("<ButtonRelease-1>", remove_target)
 
-    # Create a new frame for the target
-    frame = ttk.Frame(targets_frame, style='target.TFrame')
+        target_name_label = ttk.Label(frame, text=target.pretty_name, style='target_bold.TLabel')
+        target_name_label.grid(row=0, column=0, columnspan=2, sticky="w", padx=5, pady=5)
 
-    # Make column 2 expandable
-    frame.columnconfigure(2, weight=1)
+        ra_label = ttk.Label(frame, text=f"RA: {target.ra_str}", style='target_normal.TLabel')
+        ra_label.grid(row=1, column=0, sticky="w", padx=5, pady=5)
 
-    def remove_target(event):
-        frame.destroy()
-        if frame in target_frames:
-            target_frames.remove(frame)
-        print("Target removed.")
+        dec_label = ttk.Label(frame, text=f"Dec: {target.dec_str}", style='target_normal.TLabel')
+        dec_label.grid(row=1, column=1, sticky="w", padx=5, pady=5)
 
-    x_button = ttk.Label(frame, text="✕", style='target_normal.TLabel')
-    x_button.grid(row=0, column=2, sticky="ne", padx=2, pady=2)
-    x_button.bind("<ButtonRelease-1>", remove_target)
+        index = targets_frame.pack_slaves().index(new_target_frame)
+        frame.pack(in_=targets_frame, before=new_target_frame, fill=tk.X, padx=5, pady=2)
+        target_frames.insert(index, frame)
 
-    target_name_label = ttk.Label(frame, text=target_info["name"], style='target_bold.TLabel')
-    target_name_label.grid(row=0, column=0, columnspan=2, sticky="w", padx=5, pady=5)
+    # Add Target button
+    def on_add():
+        name = name_entry.get().strip()
+        if not name:
+            info_label.config(text="Please enter a target name.")
+            return
+        try:
+            target = AstroTarget(name)
+            # Add constraints if provided
+            if min_alt_entry.get():
+                min_alt = float(min_alt_entry.get())
+                max_alt = float(max_alt_entry.get()) if max_alt_entry.get() else None
+                if max_alt is not None:
+                    target.add_constraint('altitude', (min_alt, max_alt))
+                else:
+                    target.add_constraint('altitude', (min_alt,))
+            if moon_sep_entry.get():
+                target.add_constraint('moon_separation', (float(moon_sep_entry.get()),))
+            if moon_illum_entry.get():
+                target.add_constraint('moon_illumination', (float(moon_illum_entry.get()),))
+            # Add to main UI
+            add_target_to_main_ui(target)
+            win.destroy()
+        except Exception as e:
+            info_label.config(text=f"Error: {e}")
 
-    ra_label = ttk.Label(frame, text=f"RA: {target_info['ra']}", style='target_normal.TLabel')
-    ra_label.grid(row=1, column=0, sticky="w", padx=5, pady=5)
+    # Search button logic
+    def on_target_search():
+        name = name_entry.get().strip()
+        if not name:
+            info_label.config(text="Please enter a target name.")
+            return
+        try:
+            target = AstroTarget(name)
+            info_label.config(text=f"Found: {target.pretty_name} (RA: {target.ra_str}, Dec: {target.dec_str})",
+                              foreground="green")
+        except Exception as e:
+            info_label.config(text=f"Error: {e}", foreground="red")
 
-    ra_label = ttk.Label(frame, text=f"Dec: {target_info['dec']}", style='target_normal.TLabel')
-    ra_label.grid(row=1, column=1, sticky="w", padx=5, pady=5)
+    win = tk.Toplevel(root)
+    win.configure(background='grey14')
+    win.title("Add New Target")
+    win.grab_set()
+    ttk.Label(win, text="Add New Target", background='grey14', font=("Arial", 14, "bold")).pack(pady=10)
 
-    # Insert the new frame above new_target_frame
-    index = targets_frame.pack_slaves().index(new_target_frame)
-    frame.pack(in_=targets_frame, before=new_target_frame, fill=tk.X, padx=5, pady=2)
+    # Target name entry
+    name_frame = ttk.Frame(win)
+    name_frame.pack(pady=5, fill="x")
+    ttk.Label(name_frame, text="Target Name:").pack(side="left", padx=5)
 
-    # Keep track of frames if needed
-    target_frames.insert(index, frame)
+    name_entry = tk.Entry(name_frame, width=30)
+    name_entry.pack(side="left", padx=5)
+
+    search_btn = ttk.Button(name_frame, text="Search", style='widget.TButton')
+    search_btn.pack(side="left", padx=5)
+
+    # Info label
+    info_label = ttk.Label(win, text="", foreground="red")
+    info_label.pack(pady=5)
+
+    # Constraint entries
+    constraint_frame = ttk.LabelFrame(win, text="Constraints")
+    constraint_frame.pack(padx=10, pady=10, fill="x")
+
+    # Altitude
+    ttk.Label(constraint_frame, text="Min Altitude (deg):").grid(row=0, column=0, sticky="w")
+    min_alt_entry = ttk.Entry(constraint_frame, width=5)
+    min_alt_entry.grid(row=0, column=1)
+    ttk.Label(constraint_frame, text="Max Altitude (deg):").grid(row=0, column=2, sticky="w")
+    max_alt_entry = ttk.Entry(constraint_frame, width=5)
+    max_alt_entry.grid(row=0, column=3)
+
+    # Moon separation
+    ttk.Label(constraint_frame, text="Min Moon Separation (deg):").grid(row=1, column=0, sticky="w")
+    moon_sep_entry = ttk.Entry(constraint_frame, width=5)
+    moon_sep_entry.grid(row=1, column=1)
+
+    # Moon illumination
+    ttk.Label(constraint_frame, text="Max Moon Illumination (0-1):").grid(row=2, column=0, sticky="w")
+    moon_illum_entry = ttk.Entry(constraint_frame, width=5)
+    moon_illum_entry.grid(row=2, column=1)
+
+    add_btn = ttk.Button(win, text="Add Target", command=on_add)
+    add_btn.pack(pady=10)
+
+    search_btn.config(command=on_target_search)
 
 def show_burger_menu(event=None):
     burger_menu.tk_popup(

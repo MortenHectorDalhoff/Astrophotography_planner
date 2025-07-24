@@ -82,19 +82,20 @@ class AstroTarget:
         self.constraints = [AtNightConstraint.twilight_astronomical()]
 
         # Query Simbad for target information
-        main_id = self.__get_target_from_name(name)
+        target_dict = self.__get_target_from_name()
+        main_id = target_dict['main_id']
         self.pretty_name = self.__get_pretty_name_from_ids(result['ids'][0], main_id)
 
         # Create SkyCoord object
-        self.ra = result['ra'][0] * u.deg
-        self.dec = result['dec'][0] * u.deg
-        self.coordinate = SkyCoord(ra=ra, dec=dec)
+        self.ra = target_dict['ra']
+        self.dec = target_dict['dec']
+        self.coordinate = SkyCoord(ra=self.ra, dec=self.dec)
 
         # Create FixedTarget with main_id as name
-        self.astroplan_target = FixedTarget(name=name, coord=coord)
+        self.astroplan_target = FixedTarget(name=self.name, coord=self.coordinate)
 
         # Format RA
-        self.ra_str = target.coord.ra.to_string(unit='hourangle', sep=':')
+        self.ra_str = self.astroplan_target.coord.ra.to_string(unit='hourangle', sep=':')
 
         # Format Dec with degree, arcmin, arcsec
         deg, arcmin, arcsec = self.astroplan_target.coord.dec.dms
@@ -113,7 +114,7 @@ class AstroTarget:
         # Return a string representation of the AstroTarget object
         return f"AstroTarget(name={self.name}, ra={self.ra_str}, dec={self.dec_str})"
 
-    def add_constraint(self, constraint_type, values: tuble = None):
+    def add_constraint(self, constraint_type, values: tuple = None):
         """
         Add a constraint to the target based on the type and values provided.
 
@@ -233,8 +234,8 @@ class AstroTarget:
         # Extract start and end times from the observation window
         if observation_window['is_observable'] is False:
             return {
-                'start': None
-                'end': None
+                'start': None,
+                'end': None,
                 'is_observable': False,
                 'observable_minutes': 0 * u.minute
             }
@@ -284,7 +285,7 @@ class AstroTarget:
 
         return return_dict
 
-    def __get_pretty_name_from_ids(ids_string, main_id):
+    def __get_pretty_name_from_ids(self, ids_string, main_id):
         """
         Extract a human-readable name from the Simbad IDs string.
 
@@ -322,7 +323,7 @@ class AstroTarget:
 
         return main_id  # No pretty name found
 
-    def __get_target_from_name(name):
+    def __get_target_from_name(self):
         """
         Resolve the target name using Simbad and return the main identifier.
 
@@ -348,9 +349,9 @@ class AstroTarget:
         Simbad.add_votable_fields('ra(d)', 'dec(d)', 'ids')
 
         # Query Simbad for the target
-        result = Simbad.query_object(name)
+        result = Simbad.query_object(self.name)
         if result is None:
-            raise ValueError(f"Could not resolve target: {name}")
+            raise ValueError(f"Could not resolve target: {self.name}")
 
         # Extract main_id from the result
         main_id = result['main_id'][0].decode('utf-8') if isinstance(result['main_id'][0], bytes) else \
@@ -359,4 +360,10 @@ class AstroTarget:
         # Clean up main_id deleting multiple white spaces and 'NAME ' prefix
         main_id = re.sub(r'\s+', ' ', main_id).strip().replace('NAME ', '')  # Clean multiple white spaces
 
-        return main_id
+        return_dict = {
+            'main_id': main_id,
+            'ra': result['ra'][0] * u.deg,
+            'dec': result['dec'][0] * u.deg,
+        }
+
+        return return_dict
