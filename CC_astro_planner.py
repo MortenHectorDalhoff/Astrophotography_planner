@@ -7,18 +7,16 @@ import tkinter as tk
 from tkinter import filedialog, ttk
 from ttkthemes import ThemedStyle
 
+# Process line
+import ctypes
+import sys
+import os
+
 # Other modules
 from PIL import Image, ImageTk
 import numpy as np
 import webbrowser
 import json
-
-# Sample data
-sample_targets = [
-    {"name": "M 51", "ra": "1329m", "dec": "−47°12'"},
-    {"name": "VEGA", "ra": "18h 7m", "dec": "+33°47'"},
-    {"name": "NGC 2024", "ra": "05h 42m", "dec": "−01°52'"}
-]
 
 def open_plan_file():
     global current_file_path
@@ -154,11 +152,11 @@ def new_file():
     timezone_entry.config(state="readonly")
 
     print("updating weather images")
-    forecast_img_label.configure(image=black_forecast_img_tk)
-    forecast_img_label.image = black_forecast_img_tk
+    forecast_img_label.configure(image=blank_forecast_img_tk)
+    forecast_img_label.image = blank_forecast_img_tk
 
-    logo_img_label.configure(image=black_logo_img_tk)
-    logo_img_label.image = black_logo_img_tk
+    logo_img_label.configure(image=blank_logo_img_tk)
+    logo_img_label.image = blank_logo_img_tk
 
     update_hybrid_button()
 
@@ -246,6 +244,50 @@ def on_search():
     except Exception as e:
         print(f"Error: {e}")
 
+def add_target(event):
+    # raise the new target frame
+    print("Adding new target")
+    new_target_frame.config(relief="raised")
+
+    target_info = {
+        "name": "Andromeda Galaxy [M31]",
+        "ra": "+00h42m44.3s",
+        "dec": "+41°16′9″"
+    }
+
+
+    # Create a new frame for the target
+    frame = ttk.Frame(targets_frame, style='target.TFrame')
+
+    # Make column 2 expandable
+    frame.columnconfigure(2, weight=1)
+
+    def remove_target(event):
+        frame.destroy()
+        if frame in target_frames:
+            target_frames.remove(frame)
+        print("Target removed.")
+
+    x_button = ttk.Label(frame, text="✕", style='target_normal.TLabel')
+    x_button.grid(row=0, column=2, sticky="ne", padx=2, pady=2)
+    x_button.bind("<ButtonRelease-1>", remove_target)
+
+    target_name_label = ttk.Label(frame, text=target_info["name"], style='target_bold.TLabel')
+    target_name_label.grid(row=0, column=0, columnspan=2, sticky="w", padx=5, pady=5)
+
+    ra_label = ttk.Label(frame, text=f"RA: {target_info['ra']}", style='target_normal.TLabel')
+    ra_label.grid(row=1, column=0, sticky="w", padx=5, pady=5)
+
+    ra_label = ttk.Label(frame, text=f"Dec: {target_info['dec']}", style='target_normal.TLabel')
+    ra_label.grid(row=1, column=1, sticky="w", padx=5, pady=5)
+
+    # Insert the new frame above new_target_frame
+    index = targets_frame.pack_slaves().index(new_target_frame)
+    frame.pack(in_=targets_frame, before=new_target_frame, fill=tk.X, padx=5, pady=2)
+
+    # Keep track of frames if needed
+    target_frames.insert(index, frame)
+
 def show_burger_menu(event=None):
     burger_menu.tk_popup(
         menu_frame.winfo_rootx() + burger_button.winfo_x(),
@@ -300,8 +342,6 @@ def show_about():
     clearoutside_label.pack(anchor="w", padx=10)
     clearoutside_label.bind("<Button-1>", open_clearoutside)
 
-    #tk.messagebox.showinfo("About", message)
-
 def exit_app():
     root.quit()
 
@@ -309,9 +349,15 @@ def exit_app():
 # Initialize #
 ##############
 
-title_font = ("Arial", 16, "bold")
+# Change process line icon
+if sys.platform == "win32":
+    myappid = 'down-to-earth-media.CC_astro_planner.MainWindow'  # Arbitrary string
+    ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)
+    # Optionally, set the icon for the executable if you bundle with PyInstaller
+
 observer = Observer()
 current_file_path = None
+target_frames = []
 
 ###############
 # MAIN WINDOW #
@@ -319,13 +365,23 @@ current_file_path = None
 
 # Create window
 root = tk.Tk()
-root.iconbitmap(r'lib\icon\icon_36x36.ico')
+root.iconbitmap(r'lib\icon\icon_256x256.ico')
 root.configure(background = 'grey14')
 style =ThemedStyle(root)
 style.set_theme('equilux')
 
-style.configure('Custom.TFrame', background='grey14')
-style.configure('Light.TButton', background='white', foreground='white')
+title_font = ("Arial", 16, "bold")
+
+style.configure('Background.TFrame', background='grey14')
+style.configure('widget.TFrame', background='grey25',relief="flat")
+style.configure('widget.TButton', background='white', foreground='white')
+style.configure('widget_header.TLabel', background='grey25', foreground='grey75', font=("Arial", 16, "bold"))
+style.configure('widget.TLabel', background='grey25', foreground='grey75', font=("Arial", 10, "normal"))
+
+style.configure('target.TFrame', background='grey35', relief="raised", borderwidth=1)
+style.configure('target_normal.TLabel', background='grey35', foreground='grey75', font=("Arial", 10, "normal"))
+style.configure('target_bold.TLabel', background='grey35', foreground='grey75', font=("Arial", 12, "bold"))
+
 
 root.title("Cosmic Curiosity Astronomical Observation Planner")
 root.geometry("1200x800")
@@ -335,7 +391,7 @@ root.geometry("1200x800")
 ############
 
 # Top menu and file open
-menu_frame = ttk.Frame(root, style='Custom.TFrame')
+menu_frame = ttk.Frame(root, style='Background.TFrame')
 menu_frame.pack(fill=tk.X, padx=10, pady=5)
 
 # Add burger menu button
@@ -360,7 +416,7 @@ hybrid_button.pack(side=tk.LEFT, padx=10)
 ############
 
 # Observer frame
-observer_frame = ttk.Frame(root)
+observer_frame = ttk.Frame(root, style='widget.TFrame')
 observer_frame.pack(fill=tk.X, padx=10, pady=5)
 
 # Set row weights: only row 3 expands vertically
@@ -371,25 +427,25 @@ observer_frame.rowconfigure(3, weight=0)
 observer_frame.rowconfigure(4, weight=1)
 
 # Title
-(ttk.Label(observer_frame, text="Observer Information", font=title_font)
-    .grid(row=0, column=0, columnspan=5, sticky="w", pady=(0, 5)))
+(ttk.Label(observer_frame, text="Observer Information", style='widget_header.TLabel')
+    .grid(row=0, column=0, columnspan=5, sticky="w", padx=5, pady=(5, 5)))
 
 # Location entry and search
-location_label = ttk.Label(observer_frame, text="Location:")
-location_label.grid(row=1, column=0, sticky="w", padx=2, pady=2)
+location_label = ttk.Label(observer_frame, text="Location:", style='widget.TLabel')
+location_label.grid(row=1, column=0, sticky="w", padx=5, pady=5)
 
 location_entry = tk.Entry(observer_frame)
 location_entry.grid(row=1, column=1,columnspan=3, sticky="ew", padx=2)
 location_entry.bind("<Return>", lambda event: on_search())
 
-location_search_button = ttk.Button(observer_frame, text="Search", style ='Light.TButton',)
+location_search_button = ttk.Button(observer_frame, text="Search", style ='widget.TButton',)
 location_search_button.grid(row=1, column=4, sticky="ew", padx=5)
 location_search_button.config(command=on_search)
 
 # weather information
-black_forecast_img = Image.fromarray(np.zeros((145, 672, 4), dtype=np.uint8)).convert("RGBA")
-black_forecast_img_tk = ImageTk.PhotoImage(black_forecast_img)
-forecast_img_label = ttk.Label(observer_frame, image=black_forecast_img_tk)
+blank_forecast_img = Image.fromarray(np.zeros((145, 672, 4), dtype=np.uint8)).convert("RGBA")
+blank_forecast_img_tk = ImageTk.PhotoImage(blank_forecast_img)
+forecast_img_label = ttk.Label(observer_frame, style='widget.TLabel',image=blank_forecast_img_tk)
 forecast_img_label.grid(row=0, column=6, rowspan=5, padx=5, pady=2, sticky="e")
 forecast_img_label.bind(
     "<Button-1>",
@@ -398,9 +454,9 @@ forecast_img_label.bind(
 forecast_img_label.bind("<Enter>", set_hand_cursor)
 forecast_img_label.bind("<Leave>", set_default_cursor)
 
-black_logo_img = Image.fromarray(np.zeros((80, 122, 4), dtype=np.uint8)).convert("RGBA")
-black_logo_img_tk = ImageTk.PhotoImage(black_logo_img)
-logo_img_label = ttk.Label(observer_frame, image=black_logo_img_tk)
+blank_logo_img = Image.fromarray(np.zeros((80, 122, 4), dtype=np.uint8)).convert("RGBA")
+blank_logo_img_tk = ImageTk.PhotoImage(blank_logo_img)
+logo_img_label = ttk.Label(observer_frame, style='widget.TLabel', image=blank_logo_img_tk)
 logo_img_label.grid(row=2, column=4, rowspan=3, padx=2, pady=2, sticky="e")
 logo_img_label.bind(
     "<Button-1>",
@@ -410,22 +466,22 @@ logo_img_label.bind("<Enter>", set_hand_cursor)
 logo_img_label.bind("<Leave>", set_default_cursor)
 
 # Latitude and Longitude
-latitude_label = ttk.Label(observer_frame, text="Latitude:")
-latitude_label.grid(row=2, column=0, sticky="w", padx=2, pady=10)
+latitude_label = ttk.Label(observer_frame, text="Latitude:", style='widget.TLabel')
+latitude_label.grid(row=2, column=0, sticky="w", padx=5, pady=10)
 
 latitude_entry = ttk.Entry(observer_frame, width=15)
 latitude_entry.grid(row=2, column=1, sticky="w", padx=2, pady=10)
 latitude_entry.config(state="readonly")
 
-longitude_label = ttk.Label(observer_frame, text="Longitude:")
-longitude_label.grid(row=2, column=2, sticky="w", padx=2, pady=10)
+longitude_label = ttk.Label(observer_frame, text="Longitude:", style='widget.TLabel')
+longitude_label.grid(row=2, column=2, sticky="w", padx=5, pady=10)
 
 longitude_entry = ttk.Entry(observer_frame, width=15)
 longitude_entry.grid(row=2, column=3, sticky="w", padx=2, pady=10)
 longitude_entry.config(state="readonly")
 
 # Timezone
-timezone_label = ttk.Label(observer_frame, text="Timezone:")
+timezone_label = ttk.Label(observer_frame, text="Timezone:", style='widget.TLabel')
 timezone_label.grid(row=3, column=0, sticky="w", padx=2, pady=10)
 timezone_entry = ttk.Entry(observer_frame,)
 timezone_entry.grid(row=3, column=1, columnspan=2, sticky="ew", padx=2, pady=10)
@@ -435,19 +491,31 @@ timezone_entry.config(state="readonly")
 # TARGETS #
 ###########
 
-targets_frame = ttk.Frame(root, width=300)
-targets_frame.pack(side=tk.LEFT, padx=(10, 5), pady=5, fill=tk.Y)
+targets_frame = ttk.Frame(root, width=300, style='widget.TFrame')
+targets_frame.pack(side=tk.LEFT, padx=(10, 5),  pady=(5, 10), fill=tk.Y)
 targets_frame.pack_propagate(False)  # Prevent shrinking to fit contents
 
-ttk.Label(targets_frame, text="Targets", font=title_font).pack(anchor="n", pady=5)
+ttk.Label(targets_frame, text="Targets", style='widget_header.TLabel').pack(anchor="n", pady=5)
+
+new_target_frame = ttk.Frame(targets_frame, style='target.TFrame')
+new_target_frame.pack(fill=tk.X, padx=5, pady=5)
+new_target_frame.bind("<Button-1>", lambda event: new_target_frame.config(relief="sunken"))
+new_target_frame.bind("<ButtonRelease-1>", add_target)  # Reset text on release
+
+new_target_label = ttk.Label(new_target_frame,
+                             text="+",
+                             background='grey35',
+                             foreground='grey75',
+                             font=("Arial", 20, "normal"))
+new_target_label.pack(pady=2)
 
 
 ############
 # CALENDAR #
 ############
 
-calendar_frame = ttk.Frame(root)
-calendar_frame.pack(side=tk.LEFT, padx=(5, 10), pady=5, fill=tk.BOTH, expand=True)
+calendar_frame = ttk.Frame(root, style='widget.TFrame')
+calendar_frame.pack(side=tk.LEFT, padx=(5, 10), pady=(5, 10), fill=tk.BOTH, expand=True)
 
 # Calendar
 ##calendar_frame = ttk.Frame(root)
