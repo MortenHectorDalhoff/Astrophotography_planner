@@ -84,7 +84,8 @@ class AstroTarget:
         # Query Simbad for target information
         target_dict = self.__get_target_from_name()
         main_id = target_dict['main_id']
-        self.pretty_name = self.__get_pretty_name_from_ids(result['ids'][0], main_id)
+        ids = target_dict['ids']
+        self.pretty_name = self.__get_pretty_name_from_ids(ids, main_id)
 
         # Create SkyCoord object
         self.ra = target_dict['ra']
@@ -99,7 +100,7 @@ class AstroTarget:
 
         # Format Dec with degree, arcmin, arcsec
         deg, arcmin, arcsec = self.astroplan_target.coord.dec.dms
-        sign = '+' if self.degdeg >= 0 else '-'
+        sign = '+' if deg >= 0 else '-'
         self.dec_str = f"{sign}{abs(deg):.0f}° {abs(arcmin):.0f}' {abs(arcsec):.2f}\""
 
     def __repr__(self):
@@ -364,6 +365,7 @@ class AstroTarget:
             'main_id': main_id,
             'ra': result['ra'][0] * u.deg,
             'dec': result['dec'][0] * u.deg,
+            'ids': result['ids'][0]
         }
 
         return return_dict

@@ -277,41 +277,43 @@ def add_target(event=None):
     # Add Target button
     def on_add():
         name = name_entry.get().strip()
-        if not name:
-            info_label.config(text="Please enter a target name.")
-            return
-        try:
-            target = AstroTarget(name)
-            # Add constraints if provided
-            if min_alt_entry.get():
-                min_alt = float(min_alt_entry.get())
-                max_alt = float(max_alt_entry.get()) if max_alt_entry.get() else None
-                if max_alt is not None:
-                    target.add_constraint('altitude', (min_alt, max_alt))
-                else:
-                    target.add_constraint('altitude', (min_alt,))
-            if moon_sep_entry.get():
-                target.add_constraint('moon_separation', (float(moon_sep_entry.get()),))
-            if moon_illum_entry.get():
-                target.add_constraint('moon_illumination', (float(moon_illum_entry.get()),))
-            # Add to main UI
-            add_target_to_main_ui(target)
-            win.destroy()
-        except Exception as e:
-            info_label.config(text=f"Error: {e}")
+        target = AstroTarget(name)
+        # Add constraints if provided
+        if min_alt_entry.get():
+            min_alt = float(min_alt_entry.get())
+            max_alt = float(max_alt_entry.get()) if max_alt_entry.get() else None
+            if max_alt is not None:
+                target.add_constraint('altitude', (min_alt, max_alt))
+            else:
+                target.add_constraint('altitude', (min_alt,))
+        if moon_sep_entry.get():
+            target.add_constraint('moon_separation', (float(moon_sep_entry.get()),))
+        if moon_illum_entry.get():
+            target.add_constraint('moon_illumination', (float(moon_illum_entry.get()),))
+        # Add to main UI
+        add_target_to_main_ui(target)
+        win.destroy()
+
 
     # Search button logic
     def on_target_search():
         name = name_entry.get().strip()
-        if not name:
-            info_label.config(text="Please enter a target name.")
-            return
-        try:
-            target = AstroTarget(name)
-            info_label.config(text=f"Found: {target.pretty_name} (RA: {target.ra_str}, Dec: {target.dec_str})",
-                              foreground="green")
-        except Exception as e:
-            info_label.config(text=f"Error: {e}", foreground="red")
+        target = AstroTarget(name)
+
+        display_name_entry.config(state="normal")
+        display_name_entry.delete(0, tk.END)
+        display_name_entry.insert(0, target.pretty_name)
+        display_name_entry.config(state="readonly")
+
+        ra_entry.config(state="normal")
+        ra_entry.delete(0, tk.END)
+        ra_entry.insert(0, target.ra_str)
+        ra_entry.config(state="readonly")
+
+        dec_entry.config(state="normal")
+        dec_entry.delete(0, tk.END)
+        dec_entry.insert(0, target.dec_str)
+        dec_entry.config(state="readonly")
 
     win = tk.Toplevel(root)
     win.configure(background='grey14')
@@ -330,13 +332,30 @@ def add_target(event=None):
     search_btn = ttk.Button(name_frame, text="Search", style='widget.TButton')
     search_btn.pack(side="left", padx=5)
 
-    # Info label
-    info_label = ttk.Label(win, text="", foreground="red")
-    info_label.pack(pady=5)
+    # info section
+    info_frame = ttk.Frame(win)
+    info_frame.pack(pady=5, fill="x")
+
+    ttk.Label(info_frame, text="Display Name:").grid(row=0, column=0, padx=5, sticky="w")
+
+    display_name_entry = ttk.Entry(info_frame, width=20)
+    display_name_entry.grid(row=0, column=1, padx=5)
+    display_name_entry.config(state="readonly")
+
+    ttk.Label(info_frame, text="RA:").grid(row=1, column=0, padx=5, sticky="w")
+    ra_entry = ttk.Entry(info_frame, width=20)
+    ra_entry.grid(row=1, column=1, padx=5)
+    ra_entry.config(state="readonly")
+
+    ttk.Label(info_frame, text="Dec:").grid(row=2, column=0, padx=5, sticky="w")
+    dec_entry = ttk.Entry(info_frame, width=20)
+    dec_entry.grid(row=2, column=1, padx=5)
+    dec_entry.config(state="readonly")
 
     # Constraint entries
-    constraint_frame = ttk.LabelFrame(win, text="Constraints")
-    constraint_frame.pack(padx=10, pady=10, fill="x")
+    constraint_frame = ttk.Frame(win)
+    constraint_frame.pack(pady=5, fill="x")
+    ttk.Label(info_frame, text="Constraints").grid(row=0, column=0, padx=5, sticky="w")
 
     # Altitude
     ttk.Label(constraint_frame, text="Min Altitude (deg):").grid(row=0, column=0, sticky="w")
