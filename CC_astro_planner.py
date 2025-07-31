@@ -7,6 +7,8 @@ from lib.AstroTarget import AstroTarget
 import tkinter as tk
 from tkinter import filedialog, ttk
 from ttkthemes import ThemedStyle
+import calendar
+from datetime import datetime
 
 # Process line
 import ctypes
@@ -194,7 +196,7 @@ def set_hand_cursor(event):
 def set_default_cursor(event):
     event.widget.config(cursor="")
 
-def on_search():
+def on_observer_search():
     location = location_entry.get().strip()
 
     if not location:
@@ -226,13 +228,19 @@ def on_search():
         timezone_entry.config(state="readonly")
         print(f"Timezone entry updated: {observer.timezone}")
 
-
         print("Getting weather images...")
         # get weather images
         forecast_img, logo_img = fetch_weather_image(observer.latitude, observer.longitude)
         print("Weather images fetched.")
 
-        forecast_img_tk_new = ImageTk.PhotoImage(forecast_img)
+        #scaling image
+        scale_factor = 1.2  # Change as needed
+        new_width = int(forecast_img.width * scale_factor)
+        new_height = int(forecast_img.height * scale_factor)
+        forecast_img_resized = forecast_img.resize((new_width, new_height), Image.LANCZOS)
+
+
+        forecast_img_tk_new = ImageTk.PhotoImage(forecast_img_resized)
         forecast_img_label.configure(image=forecast_img_tk_new)
         forecast_img_label.image = forecast_img_tk_new
         print("Forecast image updated.")
@@ -245,140 +253,91 @@ def on_search():
     except Exception as e:
         print(f"Error: {e}")
 
-def add_target(event=None):
-    def add_target_to_main_ui(target):
-        # This function should add the target to your main UI as before,
-        # but using the AstroTarget object for info.
-        frame = ttk.Frame(targets_frame, style='target.TFrame')
-        frame.columnconfigure(2, weight=1)
+def on_target_search():
 
-        def remove_target(event=None):
-            frame.destroy()
-            if frame in target_frames:
-                target_frames.remove(frame)
+    global target
 
-        x_button = ttk.Label(frame, text="✕", style='target_normal.TLabel')
-        x_button.grid(row=0, column=2, sticky="ne", padx=2, pady=2)
-        x_button.bind("<ButtonRelease-1>", remove_target)
+    target_name = target_search_entry.get().strip()
 
-        target_name_label = ttk.Label(frame, text=target.pretty_name, style='target_bold.TLabel')
-        target_name_label.grid(row=0, column=0, columnspan=2, sticky="w", padx=5, pady=5)
+    if not target_name:
+        print("No target name entered.")
+        return
 
-        ra_label = ttk.Label(frame, text=f"RA: {target.ra_str}", style='target_normal.TLabel')
-        ra_label.grid(row=1, column=0, sticky="w", padx=5, pady=5)
+    print(f"Searching for target: {target_name}")
 
-        dec_label = ttk.Label(frame, text=f"Dec: {target.dec_str}", style='target_normal.TLabel')
-        dec_label.grid(row=1, column=1, sticky="w", padx=5, pady=5)
+    try:
+        # Create a new AstroTarget instance
+        target.resolve_target_from_name(target_name)
+        print(f"Target resolved: {target}")
 
-        index = targets_frame.pack_slaves().index(new_target_frame)
-        frame.pack(in_=targets_frame, before=new_target_frame, fill=tk.X, padx=5, pady=2)
-        target_frames.insert(index, frame)
-
-    # Add Target button
-    def on_add():
-        name = name_entry.get().strip()
-        target = AstroTarget(name)
-        # Add constraints if provided
-        if min_alt_entry.get():
-            min_alt = float(min_alt_entry.get())
-            max_alt = float(max_alt_entry.get()) if max_alt_entry.get() else None
-            if max_alt is not None:
-                target.add_constraint('altitude', (min_alt, max_alt))
-            else:
-                target.add_constraint('altitude', (min_alt,))
-        if moon_sep_entry.get():
-            target.add_constraint('moon_separation', (float(moon_sep_entry.get()),))
-        if moon_illum_entry.get():
-            target.add_constraint('moon_illumination', (float(moon_illum_entry.get()),))
-        # Add to main UI
-        add_target_to_main_ui(target)
-        win.destroy()
-
-
-    # Search button logic
-    def on_target_search():
-        name = name_entry.get().strip()
-        target = AstroTarget(name)
-
+        # Update entries with resolved values
         display_name_entry.config(state="normal")
         display_name_entry.delete(0, tk.END)
         display_name_entry.insert(0, target.pretty_name)
         display_name_entry.config(state="readonly")
+        print(f"Display name entry updated: {target.pretty_name}")
 
         ra_entry.config(state="normal")
         ra_entry.delete(0, tk.END)
         ra_entry.insert(0, target.ra_str)
         ra_entry.config(state="readonly")
+        print(f"RA entry updated: {target.ra_str}")
 
         dec_entry.config(state="normal")
         dec_entry.delete(0, tk.END)
         dec_entry.insert(0, target.dec_str)
         dec_entry.config(state="readonly")
+        print(f"Dec entry updated: {target.dec_str}")
 
-    win = tk.Toplevel(root)
-    win.configure(background='grey14')
-    win.title("Add New Target")
-    win.grab_set()
-    ttk.Label(win, text="Add New Target", background='grey14', font=("Arial", 14, "bold")).pack(pady=10)
+    except Exception as e:
+        print(f"Error: {e}")
 
-    # Target name entry
-    name_frame = ttk.Frame(win)
-    name_frame.pack(pady=5, fill="x")
-    ttk.Label(name_frame, text="Target Name:").pack(side="left", padx=5)
+def update_calendar(year, month):
+    month_label.config(text=f"{calendar.month_name[month]} {year}")
+    for row in calendar_tree.get_children():
+        calendar_tree.delete(row)
+    cal = calendar.Calendar(firstweekday=0)  # 0=Monday
+    month_days = cal.monthdayscalendar(year, month)
+    for week in month_days:
+        week_str = [str(day) if day != 0 else "" for day in week]
+        calendar_tree.insert('', 'end', values=week_str)
 
-    name_entry = tk.Entry(name_frame, width=30)
-    name_entry.pack(side="left", padx=5)
+def prev_month():
+    global current_year, current_month
+    if current_month == 1:
+        current_month = 12
+        current_year -= 1
+    else:
+        current_month -= 1
+    update_calendar(current_year, current_month)
 
-    search_btn = ttk.Button(name_frame, text="Search", style='widget.TButton')
-    search_btn.pack(side="left", padx=5)
+def next_month():
+    global current_year, current_month
+    if current_month == 12:
+        current_month = 1
+        current_year += 1
+    else:
+        current_month += 1
+    update_calendar(current_year, current_month)
 
-    # info section
-    info_frame = ttk.Frame(win)
-    info_frame.pack(pady=5, fill="x")
+def go_to_today():
+    global current_year, current_month
+    now = datetime.now()
+    current_year = now.year
+    current_month = now.month
+    update_calendar(current_year, current_month)
 
-    ttk.Label(info_frame, text="Display Name:").grid(row=0, column=0, padx=5, sticky="w")
-
-    display_name_entry = ttk.Entry(info_frame, width=20)
-    display_name_entry.grid(row=0, column=1, padx=5)
-    display_name_entry.config(state="readonly")
-
-    ttk.Label(info_frame, text="RA:").grid(row=1, column=0, padx=5, sticky="w")
-    ra_entry = ttk.Entry(info_frame, width=20)
-    ra_entry.grid(row=1, column=1, padx=5)
-    ra_entry.config(state="readonly")
-
-    ttk.Label(info_frame, text="Dec:").grid(row=2, column=0, padx=5, sticky="w")
-    dec_entry = ttk.Entry(info_frame, width=20)
-    dec_entry.grid(row=2, column=1, padx=5)
-    dec_entry.config(state="readonly")
-
-    # Constraint entries
-    constraint_frame = ttk.Frame(win)
-    constraint_frame.pack(pady=5, fill="x")
-    ttk.Label(info_frame, text="Constraints").grid(row=0, column=0, padx=5, sticky="w")
-
-    # Altitude
-    ttk.Label(constraint_frame, text="Min Altitude (deg):").grid(row=0, column=0, sticky="w")
-    min_alt_entry = ttk.Entry(constraint_frame, width=5)
-    min_alt_entry.grid(row=0, column=1)
-    ttk.Label(constraint_frame, text="Max Altitude (deg):").grid(row=0, column=2, sticky="w")
-    max_alt_entry = ttk.Entry(constraint_frame, width=5)
-    max_alt_entry.grid(row=0, column=3)
-
-    # Moon separation
-    ttk.Label(constraint_frame, text="Min Moon Separation (deg):").grid(row=1, column=0, sticky="w")
-    moon_sep_entry = ttk.Entry(constraint_frame, width=5)
-    moon_sep_entry.grid(row=1, column=1)
-
-    # Moon illumination
-    ttk.Label(constraint_frame, text="Max Moon Illumination (0-1):").grid(row=2, column=0, sticky="w")
-    moon_illum_entry = ttk.Entry(constraint_frame, width=5)
-    moon_illum_entry.grid(row=2, column=1)
-
-    add_btn = ttk.Button(win, text="Add Target", command=on_add)
-    add_btn.pack(pady=10)
-
-    search_btn.config(command=on_target_search)
+def update_treeview_rowheight(event=None):
+    # Get the number of weeks in the current month
+    cal = calendar.Calendar(firstweekday=0)
+    month_days = cal.monthdayscalendar(current_year, current_month)
+    num_weeks = len(month_days)
+    # Get the available height for the calendar_tree
+    available_height = calendar_frame.winfo_height() - calendar_input_frame.winfo_height() - calendar_nav_frame.winfo_height() - 30  # Adjust padding as needed
+    if num_weeks == 0:
+        return
+    rowheight = max(30, available_height // num_weeks)
+    style.configure("calendar.Treeview", rowheight=rowheight)
 
 def show_burger_menu(event=None):
     burger_menu.tk_popup(
@@ -448,8 +407,8 @@ if sys.platform == "win32":
     # Optionally, set the icon for the executable if you bundle with PyInstaller
 
 observer = Observer()
+target = AstroTarget()
 current_file_path = None
-target_frames = []
 
 ###############
 # MAIN WINDOW #
@@ -473,6 +432,8 @@ style.configure('widget.TLabel', background='grey25', foreground='grey75', font=
 style.configure('target.TFrame', background='grey35', relief="raised", borderwidth=1)
 style.configure('target_normal.TLabel', background='grey35', foreground='grey75', font=("Arial", 10, "normal"))
 style.configure('target_bold.TLabel', background='grey35', foreground='grey75', font=("Arial", 12, "bold"))
+
+style.configure("calendar.Treeview", rowheight=75)
 
 
 root.title("Cosmic Curiosity Astronomical Observation Planner")
@@ -520,25 +481,25 @@ observer_frame.rowconfigure(4, weight=1)
 
 # Title
 (ttk.Label(observer_frame, text="Observer Information", style='widget_header.TLabel')
-    .grid(row=0, column=0, columnspan=5, sticky="w", padx=5, pady=(5, 5)))
+    .grid(row=0, column=0, columnspan=3, sticky="w", padx=5, pady=(5, 5)))
 
 # Location entry and search
-location_label = ttk.Label(observer_frame, text="Location:", style='widget.TLabel')
-location_label.grid(row=1, column=0, sticky="w", padx=5, pady=5)
+location_label = ttk.Label(observer_frame, text="Location", style='widget.TLabel')
+location_label.grid(row=1, column=0, sticky="w", padx=5, pady=2)
 
 location_entry = tk.Entry(observer_frame)
-location_entry.grid(row=1, column=1,columnspan=3, sticky="ew", padx=2)
-location_entry.bind("<Return>", lambda event: on_search())
+location_entry.grid(row=2, column=0,columnspan=2, sticky="ew", padx=2, pady=(2, 15))
+location_entry.bind("<Return>", lambda event: on_observer_search())
 
 location_search_button = ttk.Button(observer_frame, text="Search", style ='widget.TButton',)
-location_search_button.grid(row=1, column=4, sticky="ew", padx=5)
-location_search_button.config(command=on_search)
+location_search_button.grid(row=2, column=2, sticky="nw", padx=5)
+location_search_button.config(command=on_observer_search)
 
 # weather information
 blank_forecast_img = Image.fromarray(np.zeros((145, 672, 4), dtype=np.uint8)).convert("RGBA")
 blank_forecast_img_tk = ImageTk.PhotoImage(blank_forecast_img)
 forecast_img_label = ttk.Label(observer_frame, style='widget.TLabel',image=blank_forecast_img_tk)
-forecast_img_label.grid(row=0, column=6, rowspan=5, padx=5, pady=2, sticky="e")
+forecast_img_label.grid(row=1, column=6, rowspan=7, padx=5, pady=2, sticky="nw")
 forecast_img_label.bind(
     "<Button-1>",
     lambda event: open_clear_outside(event, latitude=observer.latitude, longitude=observer.longitude)
@@ -549,7 +510,7 @@ forecast_img_label.bind("<Leave>", set_default_cursor)
 blank_logo_img = Image.fromarray(np.zeros((80, 122, 4), dtype=np.uint8)).convert("RGBA")
 blank_logo_img_tk = ImageTk.PhotoImage(blank_logo_img)
 logo_img_label = ttk.Label(observer_frame, style='widget.TLabel', image=blank_logo_img_tk)
-logo_img_label.grid(row=2, column=4, rowspan=3, padx=2, pady=2, sticky="e")
+logo_img_label.grid(row=3, column=2, rowspan=4, padx=2, pady=2, sticky="nw")
 logo_img_label.bind(
     "<Button-1>",
     lambda event: open_clear_outside(event, latitude=observer.latitude, longitude=observer.longitude)
@@ -558,75 +519,166 @@ logo_img_label.bind("<Enter>", set_hand_cursor)
 logo_img_label.bind("<Leave>", set_default_cursor)
 
 # Latitude and Longitude
-latitude_label = ttk.Label(observer_frame, text="Latitude:", style='widget.TLabel')
-latitude_label.grid(row=2, column=0, sticky="w", padx=5, pady=10)
+latitude_label = ttk.Label(observer_frame, text="Latitude", style='widget.TLabel')
+latitude_label.grid(row=3, column=0, sticky="w", padx=5, pady=2)
+
+longitude_label = ttk.Label(observer_frame, text="Longitude", style='widget.TLabel')
+longitude_label.grid(row=3, column=1, sticky="w", padx=5, pady=2)
 
 latitude_entry = ttk.Entry(observer_frame, width=15)
-latitude_entry.grid(row=2, column=1, sticky="w", padx=2, pady=10)
+latitude_entry.grid(row=4, column=0, sticky="w", padx=2, pady=(2, 15))
 latitude_entry.config(state="readonly")
 
-longitude_label = ttk.Label(observer_frame, text="Longitude:", style='widget.TLabel')
-longitude_label.grid(row=2, column=2, sticky="w", padx=5, pady=10)
-
 longitude_entry = ttk.Entry(observer_frame, width=15)
-longitude_entry.grid(row=2, column=3, sticky="w", padx=2, pady=10)
+longitude_entry.grid(row=4, column=1, sticky="w", padx=2, pady=(2, 15))
 longitude_entry.config(state="readonly")
 
 # Timezone
-timezone_label = ttk.Label(observer_frame, text="Timezone:", style='widget.TLabel')
-timezone_label.grid(row=3, column=0, sticky="w", padx=2, pady=10)
+timezone_label = ttk.Label(observer_frame, text="Timezone", style='widget.TLabel')
+timezone_label.grid(row=5, column=0, sticky="w", padx=2, pady=2)
 timezone_entry = ttk.Entry(observer_frame,)
-timezone_entry.grid(row=3, column=1, columnspan=2, sticky="ew", padx=2, pady=10)
+timezone_entry.grid(row=6, column=0, columnspan=2, sticky="ew", padx=2, pady=(2,15))
 timezone_entry.config(state="readonly")
 
 ###########
 # TARGETS #
 ###########
 
-targets_frame = ttk.Frame(root, width=300, style='widget.TFrame')
-targets_frame.pack(side=tk.LEFT, padx=(10, 5),  pady=(5, 10), fill=tk.Y)
-targets_frame.pack_propagate(False)  # Prevent shrinking to fit contents
+targets_frame = ttk.Frame(root, style='widget.TFrame')
+targets_frame.columnconfigure(0, weight=1)
+targets_frame.columnconfigure(1, weight=1)
+targets_frame.pack(side=tk.LEFT, padx=(10, 5),  pady=(5, 10), anchor="nw" , fill=tk.Y)
 
-ttk.Label(targets_frame, text="Targets", style='widget_header.TLabel').pack(anchor="n", pady=5)
+target_header_label = ttk.Label(targets_frame, text="Target Information", style='widget_header.TLabel')
+target_header_label.grid(row=0, column=0, columnspan=4, sticky="w", padx=5, pady=5)
 
-new_target_frame = ttk.Frame(targets_frame, style='target.TFrame')
-new_target_frame.pack(fill=tk.X, padx=5, pady=5)
-new_target_frame.bind("<Button-1>", lambda event: new_target_frame.config(relief="sunken"))
-new_target_frame.bind("<ButtonRelease-1>", add_target)  # Reset text on release
+target_search_label = ttk.Label(targets_frame, text="Target Name", style='widget.TLabel')
+target_search_label.grid(row=1, column=0, sticky="w", padx=5, pady=2)
 
-new_target_label = ttk.Label(new_target_frame,
-                             text="+",
-                             background='grey35',
-                             foreground='grey75',
-                             font=("Arial", 20, "normal"))
-new_target_label.pack(pady=2)
+target_search_entry = tk.Entry(targets_frame)
+target_search_entry.grid(row=2, column=0,columnspan=2, sticky="ew", padx=5, pady=2)
+target_search_entry.bind("<Return>", lambda event: on_target_search())
 
+target_search_button = ttk.Button(targets_frame, text="Search", style ='widget.TButton')
+target_search_button.grid(row=3, column=0, sticky="ew", padx=5, pady=(2,10))
+target_search_button.config(command=on_target_search)
+
+display_name_label = ttk.Label(targets_frame, text="Display Name", style='widget.TLabel')
+display_name_label.grid(row=4, column=0, sticky="w", padx=5, pady=2)
+
+display_name_entry = ttk.Entry(targets_frame)
+display_name_entry.grid(row=5, column=0, columnspan=2, sticky="ew", padx=5, pady=(2,5))
+display_name_entry.config(state="readonly")
+
+ra_label = ttk.Label(targets_frame, text="RA", style='widget.TLabel')
+ra_label.grid(row=6, column=0, sticky="ew", padx=5, pady=2)
+
+dec_label = ttk.Label(targets_frame, text="Dec", style='widget.TLabel')
+dec_label.grid(row=6, column=1, sticky="ew", padx=5, pady=2)
+
+ra_entry = ttk.Entry(targets_frame, width=15)
+ra_entry.grid(row=7, column=0, sticky="ew", padx=5, pady=(2,10))
+ra_entry.config(state="readonly")
+
+dec_entry = ttk.Entry(targets_frame, width=15)
+dec_entry.grid(row=7, column=1, sticky="ew", padx=5, pady=(2,10))
+dec_entry.config(state="readonly")
+
+##############
+# CONSTRAINT #
+##############
+
+constraint_header_label = ttk.Label(targets_frame, text="Constraints", style='widget_header.TLabel')
+constraint_header_label.grid(row=8, column=0, columnspan=2, sticky="w", padx=5, pady=5)
+
+observation_hours_label = ttk.Label(targets_frame, text="Minimum observation Hours", style='widget.TLabel')
+observation_hours_label.grid(row=9, column=0, columnspan=2, sticky="w", padx=5, pady=2)
+observation_hours_entry = tk.Entry(targets_frame)
+observation_hours_entry.grid(row=10, column=0, columnspan=2, sticky="ew", padx=5, pady=(2,5))
+
+min_altitude_label = ttk.Label(targets_frame, text="Min Altitude", style='widget.TLabel')
+min_altitude_label.grid(row=11, column=0, sticky="w", padx=5, pady=2)
+max_altitude_label = ttk.Label(targets_frame, text="Max Altitude", style='widget.TLabel')
+max_altitude_label.grid(row=11, column=1, sticky="w", padx=5, pady=2)
+
+min_altitude_entry = tk.Entry(targets_frame)
+min_altitude_entry.grid(row=12, column=0, sticky="ew", padx=5, pady=(2,5))
+max_altitude_entry = tk.Entry(targets_frame)
+max_altitude_entry.grid(row=12, column=1, sticky="ew", padx=5, pady=(2,5))
+
+moon_separation_label = ttk.Label(targets_frame, text="Moon Separation", style='widget.TLabel')
+moon_separation_label.grid(row=13, column=0, sticky="w", padx=5, pady=2)
+moon_separation_entry = tk.Entry(targets_frame)
+moon_separation_entry.grid(row=14, column=0, sticky="ew", padx=5, pady=(2,5))
+
+moon_phase_label = ttk.Label(targets_frame, text="Moon Phase", style='widget.TLabel')
+moon_phase_label.grid(row=15, column=0, sticky="w", padx=5, pady=0)
+moon_phase_entry = tk.Entry(targets_frame)
+moon_phase_entry.grid(row=16, column=0, sticky="ew", padx=5, pady=(2,5))
 
 ############
 # CALENDAR #
 ############
 
 calendar_frame = ttk.Frame(root, style='widget.TFrame')
-calendar_frame.pack(side=tk.LEFT, padx=(5, 10), pady=(5, 10), fill=tk.BOTH, expand=True)
+calendar_frame.pack(side=tk.LEFT, padx=(5, 10), pady=(5, 10), anchor="nw", fill=tk.BOTH, expand=True)
 
-# Calendar
-##calendar_frame = ttk.Frame(root)
-##calendar_frame.pack(side=tk.LEFT, padx=10)
 
-##ttk.Label(calendar_frame, text="April 2024", font=("Arial", 14)).pack()
+# Input Row
+calendar_input_frame = ttk.Frame(calendar_frame, style='widget.TFrame')
+calendar_input_frame.pack(fill=tk.X, padx=5, pady=(5, 10))
 
-##calendar = ttk.Treeview(calendar_frame, columns=("Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"), show='headings', height=6)
-##for col in calendar["columns"]:
-##    calendar.heading(col, text=col)
-##    calendar.column(col, width=40, anchor='center')
+min_date_label = ttk.Label(calendar_input_frame, text="Min Date", style='widget.TLabel')
+min_date_label.grid(row=0, column=0, sticky="w", padx=(0, 5))
+min_date_entry = tk.Entry(calendar_input_frame, width=12)
+min_date_entry.grid(row=0, column=1, sticky="w", padx=(0, 15))
 
-##dates = [str(i+1) for i in range(30)]
-##rows = [dates[i:i+7] for i in range(0, len(dates), 7)]
-##for row in rows:
-##    while len(row) < 7:
-##        row.append('')
-##    calendar.insert('', tk.END, values=row)
+max_date_label = ttk.Label(calendar_input_frame, text="Max Date", style='widget.TLabel')
+max_date_label.grid(row=0, column=2, sticky="w", padx=(0, 5))
+max_date_entry = tk.Entry(calendar_input_frame, width=12)
+max_date_entry.grid(row=0, column=3, sticky="w", padx=(0, 15))
 
-##calendar.pack()
+calculate_button = ttk.Button(calendar_input_frame, text="Calculate", style ='widget.TButton')
+calculate_button.grid(row=0, column=4, sticky="w")
+
+# Calendar Treeview
+calendar_nav_frame = ttk.Frame(calendar_frame, style='widget.TFrame')
+calendar_nav_frame.pack(fill=tk.X, padx=5, pady=(0, 5))
+
+prev_month_button = ttk.Button(calendar_nav_frame, text="<", width=3, style='widget.TButton')
+prev_month_button.pack(side=tk.LEFT)
+
+month_label = ttk.Label(calendar_nav_frame, text="", style='widget_header.TLabel')
+month_label.pack(side=tk.LEFT, expand=True)
+
+next_month_button = ttk.Button(calendar_nav_frame, text=">", width=3, style='widget.TButton')
+next_month_button.pack(side=tk.LEFT)
+
+today_button = ttk.Button(calendar_nav_frame, text="Today", style='widget.TButton', command=go_to_today)
+today_button.pack(side=tk.LEFT, padx=(10, 0))
+
+calendar_tree = ttk.Treeview(
+    calendar_frame,
+    columns=["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
+    show='headings',
+    height=6,
+    style="calendar.Treeview"
+)
+calendar_frame.bind("<Configure>", update_treeview_rowheight)
+
+for col in calendar_tree["columns"]:
+    calendar_tree.heading(col, text=col)
+    calendar_tree.column(col, width=40, anchor='center')
+calendar_tree.pack(fill=tk.BOTH, expand=True, padx=5)
+
+# --- Calendar logic ---
+
+current_year = datetime.now().year
+current_month = datetime.now().month
+
+prev_month_button.config(command=prev_month)
+next_month_button.config(command=next_month)
+
+update_calendar(current_year, current_month)
 
 root.mainloop()

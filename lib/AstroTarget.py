@@ -13,95 +13,10 @@ from astroquery.simbad import Simbad
 
 
 class AstroTarget:
-    def __init__(self, name):
-        """
-        Initialize an AstroTarget object with a given name.
-
-        Parameters
-        ----------
-        name : str
-            The name of the astronomical target, e.g. 'M31' or 'Andromeda Galaxy'.
-
-        Attributes
-        ----------
-        name : str
-            The name of the target.
-
-        observable_dates : list
-            List of dates when the target is observable.
-
-        minimum_observation_minutes : int
-            Minimum observation time in minutes required for this target.
-
-        constraints : list
-            List of constraints for observing the target, such as altitude, moon separation, etc.
-
-        astroplan_target : FixedTarget
-            An astroplan FixedTarget object representing the target.
-
-        ra : astropy.units.Quantity
-            Right Ascension of the target in degrees.
-
-        dec : astropy.units.Quantity
-            Declination of the target in degrees.
-
-        coordinate : SkyCoord
-            Astropy SkyCoord object representing the target's coordinates.
-
-        ra_str : str
-            Right Ascension formatted as a string in hour angle format.
-
-        dec_str : str
-            Declination formatted as a string in degrees, arcminutes, and arcseconds.
-
-        pretty_name : str
-            A more human-readable name for the target, derived from Simbad IDs.
-
-        Raises
-        ------
-        ValueError
-            If the target cannot be resolved in Simbad.
-
-        Notes
-        -----
-        This class is designed to represent an astronomical target and provide methods to check its observability
-        from a given observer's location. It uses the Simbad database to resolve target names and retrieve their
-        coordinates. The class also allows adding constraints for observing the target, such as altitude and moon separation.
-
-        Examples
-        --------
-        >>> target = AstroTarget('M31')
-        >>> print(target)
-        AstroTarget(name=M31, ra=00:42:44.3, dec=+41° 16' 9.0")
-        """
-
-        # Initial variables
-        self.name = name
+    def __init__(self):
         self.observable_dates = []
         self.minimum_observation_minutes = 0
         self.constraints = [AtNightConstraint.twilight_astronomical()]
-
-        # Query Simbad for target information
-        target_dict = self.__get_target_from_name()
-        main_id = target_dict['main_id']
-        ids = target_dict['ids']
-        self.pretty_name = self.__get_pretty_name_from_ids(ids, main_id)
-
-        # Create SkyCoord object
-        self.ra = target_dict['ra']
-        self.dec = target_dict['dec']
-        self.coordinate = SkyCoord(ra=self.ra, dec=self.dec)
-
-        # Create FixedTarget with main_id as name
-        self.astroplan_target = FixedTarget(name=self.name, coord=self.coordinate)
-
-        # Format RA
-        self.ra_str = self.astroplan_target.coord.ra.to_string(unit='hourangle', sep=':')
-
-        # Format Dec with degree, arcmin, arcsec
-        deg, arcmin, arcsec = self.astroplan_target.coord.dec.dms
-        sign = '+' if deg >= 0 else '-'
-        self.dec_str = f"{sign}{abs(deg):.0f}° {abs(arcmin):.0f}' {abs(arcsec):.2f}\""
 
     def __repr__(self):
         """
@@ -178,6 +93,27 @@ class AstroTarget:
 
             case _:
                 raise ValueError(f"Unknown constraint type: {constraint_type}")
+
+    def clear_constraints(self):
+        """
+        Clear all constraints from the target.
+
+        This method removes all constraints that have been added to the target, allowing you to start fresh
+        with a new set of constraints if needed.
+
+        Notes
+        -----
+        This is useful when you want to reset the constraints for the target without creating a new instance.
+
+        Examples
+        --------
+        >>> target = AstroTarget('M31')
+        >>> target.add_constraint('altitude', (30, 90))
+        >>> target.clear_constraints()
+        """
+
+        # Clear all constraints from the target.
+        self.constraints = [AtNightConstraint.twilight_astronomical()]
 
     def set_minimum_observation_minutes(self, min_time):
         """
@@ -324,26 +260,67 @@ class AstroTarget:
 
         return main_id  # No pretty name found
 
-    def __get_target_from_name(self):
+    def resolve_target_from_name(self, name):
         """
         Resolve the target name using Simbad and return the main identifier.
 
-        Parameters
-        ----------
-        name : str
-            The name of the astronomical target to resolve.
+       Parameters
+       ----------
+       name : str
+           The name of the astronomical target, e.g. 'M31' or 'Andromeda Galaxy'.
 
-        Returns
-        -------
-        str
-            The main identifier of the target as resolved by Simbad.
+       Attributes
+       ----------
+       name : str
+           The name of the target.
 
-        Raises
-        ------
-        ValueError
-            If the target cannot be resolved in Simbad.
-        """
-        # supress warnings about slight inaccuracy in Angular separations. Only matters for planets and other non-DSO targets
+       observable_dates : list
+           List of dates when the target is observable.
+
+       minimum_observation_minutes : int
+           Minimum observation time in minutes required for this target.
+
+       constraints : list
+           List of constraints for observing the target, such as altitude, moon separation, etc.
+
+       astroplan_target : FixedTarget
+           An astroplan FixedTarget object representing the target.
+
+       ra : astropy.units.Quantity
+           Right Ascension of the target in degrees.
+
+       dec : astropy.units.Quantity
+           Declination of the target in degrees.
+
+       coordinate : SkyCoord
+           Astropy SkyCoord object representing the target's coordinates.
+
+       ra_str : str
+           Right Ascension formatted as a string in hour angle format.
+
+       dec_str : str
+           Declination formatted as a string in degrees, arcminutes, and arcseconds.
+
+       pretty_name : str
+           A more human-readable name for the target, derived from Simbad IDs.
+
+       Raises
+       ------
+       ValueError
+           If the target cannot be resolved in Simbad.
+
+       Notes
+       -----
+       This class is designed to represent an astronomical target and provide methods to check its observability
+       from a given observer's location. It uses the Simbad database to resolve target names and retrieve their
+       coordinates. The class also allows adding constraints for observing the target, such as altitude and moon separation.
+
+       """
+
+        # Initial variables
+        self.name = name
+
+        # Query Simbad for target information
         warnings.filterwarnings('ignore', category=NonRotationTransformationWarning)
 
         # Add necessary fields to Simbad query
@@ -361,11 +338,35 @@ class AstroTarget:
         # Clean up main_id deleting multiple white spaces and 'NAME ' prefix
         main_id = re.sub(r'\s+', ' ', main_id).strip().replace('NAME ', '')  # Clean multiple white spaces
 
-        return_dict = {
-            'main_id': main_id,
-            'ra': result['ra'][0] * u.deg,
-            'dec': result['dec'][0] * u.deg,
-            'ids': result['ids'][0]
-        }
+        ids = result['ids'][0]
+        self.pretty_name = self.__get_pretty_name_from_ids(ids, main_id)
 
-        return return_dict
+        # Create SkyCoord object
+        self.ra = result['ra'][0] * u.deg
+        self.dec = result['dec'][0] * u.deg
+        self.coordinate = SkyCoord(ra=self.ra, dec=self.dec)
+
+        # Create FixedTarget with main_id as name
+        self.astroplan_target = FixedTarget(name=self.name, coord=self.coordinate)
+
+        # Format RA
+        self.ra_str = self.astroplan_target.coord.ra.to_string(unit='hourangle', sep=':')
+
+        # Format Dec with degree, arcmin, arcsec
+        deg, arcmin, arcsec = self.astroplan_target.coord.dec.dms
+        sign = '+' if deg >= 0 else '-'
+        self.dec_str = f"{sign}{abs(deg):.0f}° {abs(arcmin):.0f}' {abs(arcsec):.2f}\""
+
+
+
+
+
+
+
+
+
+
+
+
+
+
