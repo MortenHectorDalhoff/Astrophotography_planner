@@ -3,6 +3,7 @@ import re
 
 from astroplan import FixedTarget
 from astroplan.utils import time_grid_from_range
+from astroplan.constraints import Constraint
 from astroplan.constraints import AltitudeConstraint, AtNightConstraint, MoonSeparationConstraint, MoonIlluminationConstraint
 
 from astropy.coordinates import SkyCoord
@@ -10,7 +11,6 @@ from astropy.coordinates import NonRotationTransformationWarning
 import astropy.units as u
 
 from astroquery.simbad import Simbad
-
 
 class AstroTarget:
     def __init__(self):
@@ -86,10 +86,9 @@ class AstroTarget:
             case 'moon_illumination':
                 # Moon illumination constraint requires one value (max)
                 if len(values) == 1:
-                    self.constraints.append(MoonIlluminationConstraint(max=values[0]))
+                    self.constraints.append(MoonIlluminationConstraint(max=values[0]/100))
                 else:
                     raise ValueError("Moon illumination constraint requires one value (max)")
-                self.constraints.append(MoonIlluminationConstraint(max=0.5))
 
             case _:
                 raise ValueError(f"Unknown constraint type: {constraint_type}")

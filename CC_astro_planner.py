@@ -10,6 +10,7 @@ from ttkthemes import ThemedStyle
 import calendar
 from datetime import datetime
 
+
 # Process line
 import ctypes
 import sys
@@ -20,6 +21,81 @@ from PIL import Image, ImageTk
 import numpy as np
 import webbrowser
 import json
+
+#### Main interface functions ####
+
+def add_placeholder(entry, placeholder, color="grey"):
+    def on_focus_in(event):
+        if entry.get() == placeholder:
+            entry.delete(0, tk.END)
+            entry.config(fg="black")
+    def on_focus_out(event):
+        if not entry.get():
+            entry.insert(0, placeholder)
+            entry.config(fg=color)
+    entry.insert(0, placeholder)
+    entry.config(fg=color)
+    entry.bind("<FocusIn>", on_focus_in)
+    entry.bind("<FocusOut>", on_focus_out)
+
+def show_burger_menu(event=None):
+    burger_menu.tk_popup(
+        menu_frame.winfo_rootx() + burger_button.winfo_x(),
+        menu_frame.winfo_rooty() + burger_button.winfo_y() + burger_button.winfo_height()
+    )
+
+def show_about():
+    about_win = tk.Toplevel(root)
+    about_win.iconbitmap(r'lib\icon\icon_36x36.ico')
+    about_win.title("About")
+    about_win.configure(bg="white")
+    about_win.resizable(False, False)
+
+    # Load .ico image and display at top center
+    icon_img = Image.open(r'lib\icon\icon_128x128.ico')
+    icon_img_tk = ImageTk.PhotoImage(icon_img)
+    icon_label = tk.Label(about_win, image=icon_img_tk, bg="white")
+    icon_label.image = icon_img_tk  # Keep reference
+    icon_label.pack(pady=(10, 0))
+
+    message = (
+        "Cosmic Curiosity Astronomical Observation Planner\n"
+        "Version 0.2.1 Beta\n\n"
+        "Developed by Morten Hector Dalhoff\n"
+        "Contact: mhd@down-to-earth-media.com\n"
+        "Weather data from clearoutside.com\n\n"
+        "License:\n"
+        "This software is open source and may be used, copied, \n"
+        "and modified for personal, academic or professional \n"
+        "purposes. Any modified versions must include attribution \n"
+        "to the original author, Morten Hector Dalhoff. Commercial \n"
+        "redistribution or sale of the software, whether original \n"
+        "or modified, is not permitted without prior written permission.\n\n"
+        "© 2025 Morten Hector Dalhoff. All rights reserved."
+    )
+
+    tk.Label(about_win, text=message, justify="left", bg="white", font=("Arial", 10)).pack(padx=10, pady=10)
+
+    def open_github(event):
+        webbrowser.open("https://github.com/MortenHectorDalhoff/Astrophotography_planner")
+
+    def open_clearoutside(event):
+        webbrowser.open("https://clearoutside.com")
+
+    github_label = tk.Label(about_win, text="GitHub Repository", fg="blue", cursor="hand2", bg="white",
+                            font=("Arial", 10, "underline"))
+    github_label.pack(anchor="w", padx=10)
+    github_label.bind("<Button-1>", open_github)
+
+    clearoutside_label = tk.Label(about_win, text="Weather data from clearoutside.com", fg="blue", cursor="hand2",
+                                  bg="white", font=("Arial", 10, "underline"))
+    clearoutside_label.pack(anchor="w", padx=10)
+    clearoutside_label.bind("<Button-1>", open_clearoutside)
+
+def exit_app():
+    root.quit()
+
+#### File operations ####
 
 def open_plan_file():
     global current_file_path
@@ -190,11 +266,15 @@ def update_hybrid_button():
     else:
         hybrid_button.config(text="Open Plan File", command=open_plan_file)
 
+#### cursor functions ####
+
 def set_hand_cursor(event):
     event.widget.config(cursor="hand2")
 
 def set_default_cursor(event):
     event.widget.config(cursor="")
+
+#### Observer and Target Search Functions ####
 
 def on_observer_search():
     location = location_entry.get().strip()
@@ -292,15 +372,7 @@ def on_target_search():
     except Exception as e:
         print(f"Error: {e}")
 
-def update_calendar(year, month):
-    month_label.config(text=f"{calendar.month_name[month]} {year}")
-    for row in calendar_tree.get_children():
-        calendar_tree.delete(row)
-    cal = calendar.Calendar(firstweekday=0)  # 0=Monday
-    month_days = cal.monthdayscalendar(year, month)
-    for week in month_days:
-        week_str = [str(day) if day != 0 else "" for day in week]
-        calendar_tree.insert('', 'end', values=week_str)
+#### Calendar Functions ####
 
 def prev_month():
     global current_year, current_month
@@ -309,7 +381,7 @@ def prev_month():
         current_year -= 1
     else:
         current_month -= 1
-    update_calendar(current_year, current_month)
+    draw_calendar(canvas, current_year, current_month)
 
 def next_month():
     global current_year, current_month
@@ -318,83 +390,121 @@ def next_month():
         current_year += 1
     else:
         current_month += 1
-    update_calendar(current_year, current_month)
+    draw_calendar(canvas, current_year, current_month)
 
 def go_to_today():
-    global current_year, current_month
     now = datetime.now()
-    current_year = now.year
-    current_month = now.month
-    update_calendar(current_year, current_month)
+    draw_calendar(canvas, now.year, now.month)
 
-def update_treeview_rowheight(event=None):
-    # Get the number of weeks in the current month
+def draw_calendar(canvas, year, month):
+    # Set the month/year label
+    month_name = calendar.month_name[month]
+    month_label.config(text=f"{month_name} {year}")
+
+    canvas.delete("all")
+
+    width = canvas.winfo_width()
+    height = canvas.winfo_height()
+    cal = calendar.Calendar(firstweekday=0)
+    month_days = cal.monthdayscalendar(year, month)
+    rows = len(month_days)
+    header_h = 30 if rows == 0 else max(20, height // (2 * (rows + 1)))  # Set a minimum header height
+    cell_h = (height - header_h) // rows if rows else 60
+    cell_w = width // 7
+
+    # Draw weekday headers
+    days_abbr = calendar.day_abbr
+    for j, day_name in enumerate(days_abbr):
+        x0, y0 = j * cell_w, 0
+        canvas.create_rectangle(x0, y0, x0 + cell_w, header_h, fill="#444444", outline="#888888")  # grey35
+        canvas.create_text(
+            x0 + cell_w // 2, y0 + header_h // 2,
+            text=day_name,
+            font=("Arial", 12, "bold"),
+            fill="#bfbfbf"  # grey75
+        )
+
+    # Draw days (start from row 1)
+    for i, week in enumerate(month_days):
+        for j, day in enumerate(week):
+            x0, y0 = j * cell_w, header_h + i * cell_h
+            x1, y1 = x0 + cell_w, y0 + cell_h
+            if (day == datetime.now().day and month == datetime.now().month and year == datetime.now().year):
+                fill_color = "#666666"  # lighter highlight
+            else:
+                fill_color = "#323232"  # grey25
+            canvas.create_rectangle(x0, y0, x1, y1, fill=fill_color, outline="#888888")
+            if day != 0:
+                canvas.create_text(
+                    x0 + 10, y0 + 10,
+                    anchor="nw",
+                    text=str(day),
+                    font=("Arial", 14, "bold"),
+                    fill="#bfbfbf"  # grey75
+                )
+
+def on_canvas_resize(event):
+    draw_calendar(canvas, now.year, now.month)
+
+def set_start_date(date_str):
+    min_date_entry.delete(0, tk.END)
+    min_date_entry.insert(0, date_str)
+
+    # Check and update end date if needed
+    end_date = max_date_entry.get().strip()
+    try:
+        new_start = datetime.strptime(date_str, "%Y-%m-%d")
+        if end_date:
+            end_dt = datetime.strptime(end_date, "%Y-%m-%d")
+            if new_start > end_dt:
+                max_date_entry.delete(0, tk.END)
+                max_date_entry.insert(0, date_str)
+    except ValueError:
+        pass  # Ignore invalid date format
+
+def set_end_date(date_str):
+    max_date_entry.delete(0, tk.END)
+    max_date_entry.insert(0, date_str)
+
+    # Check and update start date if needed
+    start_date = min_date_entry.get().strip()
+    try:
+        new_end = datetime.strptime(date_str, "%Y-%m-%d")
+        if start_date:
+            start_dt = datetime.strptime(start_date, "%Y-%m-%d")
+            if new_end < start_dt:
+                min_date_entry.delete(0, tk.END)
+                min_date_entry.insert(0, date_str)
+    except ValueError:
+        pass  # Ignore invalid date format
+
+def on_calendar_right_click(event):
+    # Find which day was clicked
+    x, y = event.x, event.y
+    width = canvas.winfo_width()
+    height = canvas.winfo_height()
     cal = calendar.Calendar(firstweekday=0)
     month_days = cal.monthdayscalendar(current_year, current_month)
-    num_weeks = len(month_days)
-    # Get the available height for the calendar_tree
-    available_height = calendar_frame.winfo_height() - calendar_input_frame.winfo_height() - calendar_nav_frame.winfo_height() - 30  # Adjust padding as needed
-    if num_weeks == 0:
+    rows = len(month_days)
+    header_h = 30 if rows == 0 else max(20, height // (2 * (rows + 1)))
+    cell_h = (height - header_h) // rows if rows else 60
+    cell_w = width // 7
+
+    # Check if click is in the day grid
+    if y < header_h:
         return
-    rowheight = max(30, available_height // num_weeks)
-    style.configure("calendar.Treeview", rowheight=rowheight)
-
-def show_burger_menu(event=None):
-    burger_menu.tk_popup(
-        menu_frame.winfo_rootx() + burger_button.winfo_x(),
-        menu_frame.winfo_rooty() + burger_button.winfo_y() + burger_button.winfo_height()
-    )
-
-def show_about():
-    about_win = tk.Toplevel(root)
-    about_win.iconbitmap(r'lib\icon\icon_36x36.ico')
-    about_win.title("About")
-    about_win.configure(bg="white")
-    about_win.resizable(False, False)
-
-    # Load .ico image and display at top center
-    icon_img = Image.open(r'lib\icon\icon_128x128.ico')
-    icon_img_tk = ImageTk.PhotoImage(icon_img)
-    icon_label = tk.Label(about_win, image=icon_img_tk, bg="white")
-    icon_label.image = icon_img_tk  # Keep reference
-    icon_label.pack(pady=(10, 0))
-
-    message = (
-        "Cosmic Curiosity Astronomical Observation Planner\n"
-        "Version 0.2.1 Beta\n\n"
-        "Developed by Morten Hector Dalhoff\n"
-        "Contact: mhd@down-to-earth-media.com\n"
-        "Weather data from clearoutside.com\n\n"
-        "License:\n"
-        "This software is open source and may be used, copied, \n"
-        "and modified for personal, academic or professional \n"
-        "purposes. Any modified versions must include attribution \n"
-        "to the original author, Morten Hector Dalhoff. Commercial \n"
-        "redistribution or sale of the software, whether original \n"
-        "or modified, is not permitted without prior written permission.\n\n"
-        "© 2025 Morten Hector Dalhoff. All rights reserved."
-    )
-
-    tk.Label(about_win, text=message, justify="left", bg="white", font=("Arial", 10)).pack(padx=10, pady=10)
-
-    def open_github(event):
-        webbrowser.open("https://github.com/MortenHectorDalhoff/Astrophotography_planner")
-
-    def open_clearoutside(event):
-        webbrowser.open("https://clearoutside.com")
-
-    github_label = tk.Label(about_win, text="GitHub Repository", fg="blue", cursor="hand2", bg="white",
-                            font=("Arial", 10, "underline"))
-    github_label.pack(anchor="w", padx=10)
-    github_label.bind("<Button-1>", open_github)
-
-    clearoutside_label = tk.Label(about_win, text="Weather data from clearoutside.com", fg="blue", cursor="hand2",
-                                  bg="white", font=("Arial", 10, "underline"))
-    clearoutside_label.pack(anchor="w", padx=10)
-    clearoutside_label.bind("<Button-1>", open_clearoutside)
-
-def exit_app():
-    root.quit()
+    row = (y - header_h) // cell_h
+    col = x // cell_w
+    if 0 <= row < rows and 0 <= col < 7:
+        day = month_days[row][col]
+        if day == 0:
+            return
+        date_str = f"{current_year:04d}-{current_month:02d}-{day:02d}"
+        # Show context menu
+        calendar_menu.delete(0, tk.END)
+        calendar_menu.add_command(label="Set Start Date", command=lambda: set_start_date(date_str))
+        calendar_menu.add_command(label="Set End Date", command=lambda: set_end_date(date_str))
+        calendar_menu.tk_popup(canvas.winfo_rootx() + x, canvas.winfo_rooty() + y)
 
 ##############
 # Initialize #
@@ -595,6 +705,7 @@ observation_hours_label = ttk.Label(targets_frame, text="Minimum observation Hou
 observation_hours_label.grid(row=9, column=0, columnspan=2, sticky="w", padx=5, pady=2)
 observation_hours_entry = tk.Entry(targets_frame)
 observation_hours_entry.grid(row=10, column=0, columnspan=2, sticky="ew", padx=5, pady=(2,5))
+add_placeholder(observation_hours_entry, "Minimum observation Hours")
 
 min_altitude_label = ttk.Label(targets_frame, text="Min Altitude", style='widget.TLabel')
 min_altitude_label.grid(row=11, column=0, sticky="w", padx=5, pady=2)
@@ -603,18 +714,23 @@ max_altitude_label.grid(row=11, column=1, sticky="w", padx=5, pady=2)
 
 min_altitude_entry = tk.Entry(targets_frame)
 min_altitude_entry.grid(row=12, column=0, sticky="ew", padx=5, pady=(2,5))
+add_placeholder(min_altitude_entry, "0 to 90 (degrees)")
+
 max_altitude_entry = tk.Entry(targets_frame)
 max_altitude_entry.grid(row=12, column=1, sticky="ew", padx=5, pady=(2,5))
+add_placeholder(max_altitude_entry, "0 to 90 (degrees)")
 
 moon_separation_label = ttk.Label(targets_frame, text="Moon Separation", style='widget.TLabel')
 moon_separation_label.grid(row=13, column=0, sticky="w", padx=5, pady=2)
 moon_separation_entry = tk.Entry(targets_frame)
 moon_separation_entry.grid(row=14, column=0, sticky="ew", padx=5, pady=(2,5))
+add_placeholder(moon_separation_entry, "0 to 180 (degrees)")
 
 moon_phase_label = ttk.Label(targets_frame, text="Moon Phase", style='widget.TLabel')
 moon_phase_label.grid(row=15, column=0, sticky="w", padx=5, pady=0)
 moon_phase_entry = tk.Entry(targets_frame)
 moon_phase_entry.grid(row=16, column=0, sticky="ew", padx=5, pady=(2,5))
+add_placeholder(moon_phase_entry, "0 to 100 (percent)")
 
 ############
 # CALENDAR #
@@ -623,62 +739,57 @@ moon_phase_entry.grid(row=16, column=0, sticky="ew", padx=5, pady=(2,5))
 calendar_frame = ttk.Frame(root, style='widget.TFrame')
 calendar_frame.pack(side=tk.LEFT, padx=(5, 10), pady=(5, 10), anchor="nw", fill=tk.BOTH, expand=True)
 
-
 # Input Row
 calendar_input_frame = ttk.Frame(calendar_frame, style='widget.TFrame')
 calendar_input_frame.pack(fill=tk.X, padx=5, pady=(5, 10))
 
-min_date_label = ttk.Label(calendar_input_frame, text="Min Date", style='widget.TLabel')
+min_date_label = ttk.Label(calendar_input_frame, text="Start Date", style='widget.TLabel')
 min_date_label.grid(row=0, column=0, sticky="w", padx=(0, 5))
-min_date_entry = tk.Entry(calendar_input_frame, width=12)
+min_date_entry = tk.Entry(calendar_input_frame, width=16)
 min_date_entry.grid(row=0, column=1, sticky="w", padx=(0, 15))
+add_placeholder(min_date_entry, "YYYY-MM-DD")
 
-max_date_label = ttk.Label(calendar_input_frame, text="Max Date", style='widget.TLabel')
+max_date_label = ttk.Label(calendar_input_frame, text="End Date", style='widget.TLabel')
 max_date_label.grid(row=0, column=2, sticky="w", padx=(0, 5))
-max_date_entry = tk.Entry(calendar_input_frame, width=12)
+max_date_entry = tk.Entry(calendar_input_frame, width=16)
 max_date_entry.grid(row=0, column=3, sticky="w", padx=(0, 15))
+add_placeholder(max_date_entry, "YYYY-MM-DD")
 
 calculate_button = ttk.Button(calendar_input_frame, text="Calculate", style ='widget.TButton')
 calculate_button.grid(row=0, column=4, sticky="w")
 
-# Calendar Treeview
+# Calendar navigation
 calendar_nav_frame = ttk.Frame(calendar_frame, style='widget.TFrame')
 calendar_nav_frame.pack(fill=tk.X, padx=5, pady=(0, 5))
 
 prev_month_button = ttk.Button(calendar_nav_frame, text="<", width=3, style='widget.TButton')
 prev_month_button.pack(side=tk.LEFT)
+prev_month_button.config(command=prev_month)
 
 month_label = ttk.Label(calendar_nav_frame, text="", style='widget_header.TLabel')
 month_label.pack(side=tk.LEFT, expand=True)
 
 next_month_button = ttk.Button(calendar_nav_frame, text=">", width=3, style='widget.TButton')
 next_month_button.pack(side=tk.LEFT)
+next_month_button.config(command=next_month)
 
 today_button = ttk.Button(calendar_nav_frame, text="Today", style='widget.TButton', command=go_to_today)
 today_button.pack(side=tk.LEFT, padx=(10, 0))
+today_button.config(command=go_to_today)
 
-calendar_tree = ttk.Treeview(
-    calendar_frame,
-    columns=["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
-    show='headings',
-    height=6,
-    style="calendar.Treeview"
-)
-calendar_frame.bind("<Configure>", update_treeview_rowheight)
+# Calendar Canvas
 
-for col in calendar_tree["columns"]:
-    calendar_tree.heading(col, text=col)
-    calendar_tree.column(col, width=40, anchor='center')
-calendar_tree.pack(fill=tk.BOTH, expand=True, padx=5)
+calendar_menu = tk.Menu(root, tearoff=0)
 
-# --- Calendar logic ---
+canvas = tk.Canvas(calendar_frame, width=7*80, height=7*60, bg="grey25")
+canvas.pack(fill=tk.BOTH, expand=True)
+canvas.bind("<Configure>", on_canvas_resize)
+canvas.bind("<Button-3>", on_calendar_right_click)
 
-current_year = datetime.now().year
-current_month = datetime.now().month
+now = datetime.now()
+current_year = now.year
+current_month = now.month
 
-prev_month_button.config(command=prev_month)
-next_month_button.config(command=next_month)
-
-update_calendar(current_year, current_month)
+draw_calendar(canvas, current_year, current_month)
 
 root.mainloop()
