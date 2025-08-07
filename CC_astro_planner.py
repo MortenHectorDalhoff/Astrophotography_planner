@@ -8,8 +8,7 @@ import tkinter as tk
 from tkinter import filedialog, ttk
 from ttkthemes import ThemedStyle
 import calendar
-from datetime import datetime
-
+from datetime import datetime, timedelta
 
 # Process line
 import ctypes
@@ -408,20 +407,30 @@ def draw_calendar(canvas, year, month):
     cal = calendar.Calendar(firstweekday=0)
     month_days = cal.monthdayscalendar(year, month)
     rows = len(month_days)
-    header_h = 30 if rows == 0 else max(20, height // (2 * (rows + 1)))  # Set a minimum header height
+    header_h = 30 if rows == 0 else max(20, height // (2 * (rows + 1)))
     cell_h = (height - header_h) // rows if rows else 60
     cell_w = width // 7
+
+    # Parse min/max date
+    try:
+        min_date = datetime.strptime(min_date_entry.get().strip(), "%Y-%m-%d")
+    except Exception:
+        min_date = None
+    try:
+        max_date = datetime.strptime(max_date_entry.get().strip(), "%Y-%m-%d")
+    except Exception:
+        max_date = None
 
     # Draw weekday headers
     days_abbr = calendar.day_abbr
     for j, day_name in enumerate(days_abbr):
         x0, y0 = j * cell_w, 0
-        canvas.create_rectangle(x0, y0, x0 + cell_w, header_h, fill="#444444", outline="#888888")  # grey35
+        canvas.create_rectangle(x0, y0, x0 + cell_w, header_h, fill="#444444", outline="#888888")
         canvas.create_text(
             x0 + cell_w // 2, y0 + header_h // 2,
             text=day_name,
             font=("Arial", 12, "bold"),
-            fill="#bfbfbf"  # grey75
+            fill="#bfbfbf"
         )
 
     # Draw days (start from row 1)
@@ -429,10 +438,16 @@ def draw_calendar(canvas, year, month):
         for j, day in enumerate(week):
             x0, y0 = j * cell_w, header_h + i * cell_h
             x1, y1 = x0 + cell_w, y0 + cell_h
-            if (day == datetime.now().day and month == datetime.now().month and year == datetime.now().year):
-                fill_color = "#666666"  # lighter highlight
-            else:
-                fill_color = "#323232"  # grey25
+            fill_color = "#323232"  # default
+
+            if day != 0:
+                this_date = datetime(year, month, day)
+                # Highlight if in range
+                if min_date and max_date and min_date <= this_date <= max_date:
+                    fill_color = "#666666"  # greenish highlight
+                elif (day == datetime.now().day and month == datetime.now().month and year == datetime.now().year):
+                    fill_color = "#666666"  # today highlight
+
             canvas.create_rectangle(x0, y0, x1, y1, fill=fill_color, outline="#888888")
             if day != 0:
                 canvas.create_text(
@@ -440,7 +455,7 @@ def draw_calendar(canvas, year, month):
                     anchor="nw",
                     text=str(day),
                     font=("Arial", 14, "bold"),
-                    fill="#bfbfbf"  # grey75
+                    fill="#bfbfbf"
                 )
 
 def on_canvas_resize(event):
@@ -462,6 +477,8 @@ def set_start_date(date_str):
     except ValueError:
         pass  # Ignore invalid date format
 
+    draw_calendar(canvas, current_year, current_month)
+
 def set_end_date(date_str):
     max_date_entry.delete(0, tk.END)
     max_date_entry.insert(0, date_str)
@@ -477,6 +494,11 @@ def set_end_date(date_str):
                 min_date_entry.insert(0, date_str)
     except ValueError:
         pass  # Ignore invalid date format
+
+    draw_calendar(canvas, current_year, current_month)
+
+def on_date_entry_update(event=None):
+    draw_calendar(canvas, current_year, current_month)
 
 def on_calendar_right_click(event):
     # Find which day was clicked
@@ -506,6 +528,141 @@ def on_calendar_right_click(event):
         calendar_menu.add_command(label="Set End Date", command=lambda: set_end_date(date_str))
         calendar_menu.tk_popup(canvas.winfo_rootx() + x, canvas.winfo_rooty() + y)
 
+#### Calculation Functions ####
+
+def on_calculate():
+    # 1. Validate observer/location
+    if not getattr(observer, "location_name", None) or not getattr(observer, "latitude", None) or not getattr(observer, "longitude", None):
+        raise ValueError("Please set a valid observer location.")
+
+    # 2. Validate target
+    if not getattr(target, "coordinate", None):
+        raise ValueError("Please select a valid target.")
+
+    # 3. Clear all constraints on the target
+    if hasattr(target, "clear_constraints"):
+        target.clear_constraints()
+
+    # 4. Validate and add constraints
+    # Minimum observation hours
+    obs_hours = observation_hours_entry.get().strip()
+    if obs_hours and obs_hours != "Minimum observation Hours":
+        try:
+            obs_hours_val = float(obs_hours)
+            if obs_hours_val <= 0:
+                raise ValueError("Minimum observation hours must be a positive number.")
+            target.set_minimum_observation_minutes(int(obs_hours_val * 60))
+        except ValueError:
+            raise ValueError("Minimum observation hours must be a positive number.")
+
+    # Min altitude
+    min_alt = min_altitude_entry.get().strip()
+    min_alt_val = None
+    if min_alt and min_alt != "0 to 90 (degrees)":
+        try:
+            min_alt_val = float(min_alt)
+            if not (0 <= min_alt_val <= 90):
+                raise ValueError("Minimum altitude must be between 0 and 90.")
+        except ValueError:
+            raise ValueError("Minimum altitude must be a number between 0 and 90.")
+
+    # Max altitude
+    max_alt = max_altitude_entry.get().strip()
+    max_alt_val = None
+    if max_alt and max_alt != "0 to 90 (degrees)":
+        try:
+            max_alt_val = float(max_alt)
+            if not (0 <= max_alt_val <= 90):
+                raise ValueError("Maximum altitude must be between 0 and 90.")
+        except ValueError:
+            raise ValueError("Maximum altitude must be a number between 0 and 90.")
+
+    # Add altitude constraint if valid
+    if min_alt_val is not None or max_alt_val is not None:
+        vals = []
+        if min_alt_val is not None and max_alt_val is not None:
+            if min_alt_val > max_alt_val:
+                raise ValueError("Minimum altitude cannot be greater than maximum altitude.")
+            vals = (min_alt_val, max_alt_val)
+        elif min_alt_val is not None:
+            vals = (min_alt_val,)
+        elif max_alt_val is not None:
+            vals = (0, max_alt_val)
+        if vals:
+            target.add_constraint('altitude', vals)
+
+    # Moon separation
+    moon_sep = moon_separation_entry.get().strip()
+    if moon_sep and moon_sep != "0 to 180 (degrees)":
+        try:
+            moon_sep_val = float(moon_sep)
+            if not (0 <= moon_sep_val <= 180):
+                raise ValueError("Moon separation must be between 0 and 180.")
+            target.add_constraint('moon_separation', (moon_sep_val,))
+        except ValueError:
+            raise ValueError("Moon separation must be a number between 0 and 180.")
+
+    # Moon phase
+    moon_phase = moon_phase_entry.get().strip()
+    if moon_phase and moon_phase != "0 to 100 (percent)":
+        try:
+            moon_phase_val = float(moon_phase)
+            if not (0 <= moon_phase_val <= 100):
+                raise ValueError("Moon phase must be between 0 and 100.")
+            target.add_constraint('moon_illumination', (moon_phase_val,))
+        except ValueError:
+            raise ValueError("Moon phase must be a number between 0 and 100.")
+
+    #5. Validate date range
+    min_date_str = min_date_entry.get().strip()
+    max_date_str = max_date_entry.get().strip()
+    if not min_date_str or not max_date_str:
+        # If no dates are set, use the current date
+        now = datetime.now()
+        min_date_str = now.strftime("%Y-%m-%d")
+        max_date_str = now.strftime("%Y-%m-%d")
+
+    try:
+        min_date = datetime.strptime(min_date_str, "%Y-%m-%d")
+        max_date = datetime.strptime(max_date_str, "%Y-%m-%d")
+        if min_date > max_date:
+            raise ValueError("Minimum date cannot be after maximum date.")
+
+    except ValueError:
+        raise ValueError("Invalid date format. Please use YYYY-MM-DD.")
+
+    # loop through the days in the range
+    calendar_events.clear()
+
+    for single_date in (min_date + timedelta(days=n) for n in range((max_date - min_date).days + 1)):
+        single_date_observation_window = target.get_observation_window(observer, single_date)
+        if single_date_observation_window['is_observable']:
+            ovservable_days.append(single_date_observation_window)
+            # Extract event info
+            start = single_date_observation_window['start']
+            end = single_date_observation_window['end']
+            total = single_date_observation_window['observable_minutes']
+            # Convert astropy Time to datetime if needed
+            if hasattr(start, 'datetime'):
+                start_dt = start.datetime
+            else:
+                start_dt = start
+            if hasattr(end, 'datetime'):
+                end_dt = end.datetime
+            else:
+                end_dt = end
+            # Store event
+            calendar_events.append({
+                'date': single_date.strftime("%Y-%m-%d"),
+                'start': start_dt,
+                'end': end_dt,
+                'total_minutes': int(total.value) if hasattr(total, 'value') else total
+            })
+            print(f"Target {target.pretty_name} is observable on {single_date.strftime('%Y-%m-%d')}")
+
+    # Optionally, trigger a calendar redraw here
+    draw_calendar(canvas, current_year, current_month)
+
 ##############
 # Initialize #
 ##############
@@ -518,6 +675,7 @@ if sys.platform == "win32":
 
 observer = Observer()
 target = AstroTarget()
+calendar_events = []
 current_file_path = None
 
 ###############
@@ -748,15 +906,20 @@ min_date_label.grid(row=0, column=0, sticky="w", padx=(0, 5))
 min_date_entry = tk.Entry(calendar_input_frame, width=16)
 min_date_entry.grid(row=0, column=1, sticky="w", padx=(0, 15))
 add_placeholder(min_date_entry, "YYYY-MM-DD")
+min_date_entry.bind("<FocusOut>", on_date_entry_update)
+min_date_entry.bind("<Return>", on_date_entry_update)
 
 max_date_label = ttk.Label(calendar_input_frame, text="End Date", style='widget.TLabel')
 max_date_label.grid(row=0, column=2, sticky="w", padx=(0, 5))
 max_date_entry = tk.Entry(calendar_input_frame, width=16)
 max_date_entry.grid(row=0, column=3, sticky="w", padx=(0, 15))
 add_placeholder(max_date_entry, "YYYY-MM-DD")
+max_date_entry.bind("<FocusOut>", on_date_entry_update)
+max_date_entry.bind("<Return>", on_date_entry_update)
 
 calculate_button = ttk.Button(calendar_input_frame, text="Calculate", style ='widget.TButton')
 calculate_button.grid(row=0, column=4, sticky="w")
+calculate_button.config(command=on_calculate)
 
 # Calendar navigation
 calendar_nav_frame = ttk.Frame(calendar_frame, style='widget.TFrame')
