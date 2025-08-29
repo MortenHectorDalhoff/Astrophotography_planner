@@ -21,6 +21,9 @@ import numpy as np
 import webbrowser
 import json
 
+
+##### WORK IN PROCESS - NOT FINALIZED #####
+
 #### Main interface functions ####
 
 def add_placeholder(entry, placeholder, color="grey"):
@@ -661,7 +664,7 @@ def on_calculate():
             print(f"Target {target.pretty_name} is observable on {single_date.strftime('%Y-%m-%d')}")
 
     # Optionally, trigger a calendar redraw here
-    draw_calendar(canvas, current_year, current_month)
+    draw_calendar(canvas,  , current_month)
 
 ##############
 # Initialize #

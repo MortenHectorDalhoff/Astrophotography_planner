@@ -1,10 +1,12 @@
-pandas==2.3.0
+astroquery==0.4.10
 astroplan==0.10.1
 astropy==7.1.0
 geopy==2.4.1
 timezonefinder==6.5.9
+discord==2.3.2
+
 pyyaml==6.0.2
-astroquery==0.4.10
+pandas==2.3.0
 ics==0.7.2
 matplotlib==3.10.3
 ttkthemes==3.2.2

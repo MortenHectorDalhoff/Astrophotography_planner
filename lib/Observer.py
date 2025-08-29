@@ -5,7 +5,7 @@ from astroplan import Observer
 import astropy.units as u
 from astropy.time import Time
 
-class Observer:
+class AstroObserver:
 
     def __init__(self):
         pass
