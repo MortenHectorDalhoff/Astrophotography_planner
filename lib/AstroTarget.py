@@ -8,6 +8,7 @@ from astroplan.constraints import AltitudeConstraint, AtNightConstraint, MoonSep
 
 from astropy.coordinates import SkyCoord
 from astropy.coordinates import NonRotationTransformationWarning
+from astropy.time import Time
 import astropy.units as u
 
 from astroquery.simbad import Simbad
@@ -29,6 +30,17 @@ class AstroTarget:
         """
         # Return a string representation of the AstroTarget object
         return f"AstroTarget(name={self.name}, ra={self.ra_str}, dec={self.dec_str})"
+
+    def _format_time(self, jd):
+        if isinstance(jd, str):
+            return jd
+        t = Time(jd, format='jd')
+        return t.to_datetime().strftime('%H:%M')
+    
+    def _minutes_to_time_str(self, minutes):
+        hours = minutes // 60
+        mins = minutes % 60
+        return f"{int(hours)}h {int(mins)}m"
 
     def add_constraint(self, constraint_type, values: tuple = None):
         """
@@ -176,23 +188,34 @@ class AstroTarget:
                 'observable_minutes': 0 * u.minute
             }
 
+        observation_window_start = observation_window['start']
+        observation_window_end = observation_window['end']
+
         # Calcualte a list of times where the targer is checked for observability
         time_grid = time_grid_from_range([observation_window_start, observation_window_end],
                                          time_resolution=10 * u.minute)
-
+        
         # Check if the target is observable at each time in the grid
         constraint_masks = [
-            constraint(observer, [self.astroplan_target], times=time_grid)  # One array of booleans per constraint
+            constraint(observer.get_observer(), [self.astroplan_target], times=time_grid)  # One array of booleans per constraint
             for constraint in self.constraints
         ]
+        
+        # Track which constraints are broken
+        broken_constraints = []
+        for i, mask in enumerate(constraint_masks):
+            if not mask.any():  # If all values are False, constraint is broken
+                broken_constraints.append(type(self.constraints[i]).__name__)
+
         # Combine the masks from all constraints
         combined_mask = constraint_masks[0]
+        
         for mask in constraint_masks[1:]:
             combined_mask &= mask
 
         # Calculate the total observable time in minutes
-        target_observable_minutes = combined_mask.sum() * 10 * u.minute
-
+        target_observable_minutes = combined_mask.sum() * 10
+        
         if target_observable_minutes >= self.minimum_observation_minutes:
 
             is_observable = True
@@ -211,14 +234,19 @@ class AstroTarget:
                 observation_window_end = "Unknown"
         else:
             is_observable = False
+            # print constraints not met
 
 
         return_dict = {}
-        return_dict['start'] = observation_window_start
-        return_dict['end'] = observation_window_end
         return_dict['is_observable'] = is_observable
+        return_dict['start'] = observation_window_start
+        return_dict['start_str'] = self._format_time(observation_window_start)
+        return_dict['end'] = observation_window_end
+        return_dict['end_str'] = self._format_time(observation_window_end)
         return_dict['observable_minutes'] = target_observable_minutes
-
+        return_dict['observable_time_str'] = self._minutes_to_time_str(target_observable_minutes)
+        return_dict['broken_constraints'] = broken_constraints
+        
         return return_dict
 
     def __get_pretty_name_from_ids(self, ids_string, main_id):
