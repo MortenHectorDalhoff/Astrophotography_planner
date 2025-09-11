@@ -4,6 +4,8 @@ import discord
 from discord.ext import commands
 from datetime import datetime, timedelta
 import os
+import sys  
+import csv
 
 # Define bot intents
 intents = discord.Intents.default()
@@ -13,36 +15,49 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 
 @bot.event
 async def on_ready():
+
+    # Check of log folder is present, if not create it
+    if not os.path.exists("logs"):
+        os.makedirs("logs")
+
     await bot.tree.sync()
     print(f"Logged in as {bot.user}")
 
-# Define the slash command
-@bot.tree.command(name="astroplan", description="Get observation details for a location and target")
-async def astroplan(
+# Define astro_target_window command
+@bot.tree.command(name="astro_target_window", description="Get observation details for a location and target")
+async def astro_target_window(
     interaction: discord.Interaction,
     location_name: str,
     target_name: str,
     minimum_observation_minutes: str = "10",
-    min_altitude: str = "0.0",
-    max_altitude: str = "90.0",
-    moon_separation: str = "0.0",
-    moon_illumination: str = "1.0"
+    minimum_altitude: str = "0.0",
+    maximum_altitude: str = "90.0",
+    minimum_moon_separation: str = "0.0",
+    maximum_moon_illumination: str = "100"
     ):
 
     await interaction.response.defer()
 
+    # start a log file for this interaction
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    username = interaction.user.name.replace(" ", "_")
+    log_filename = f"logs/astro_target_window_{timestamp}_{username}.log"
+    log_file = open(log_filename, "a", encoding="utf-8")
+    console = sys.stdout  # Save the current stdout to restore later
+    sys.stdout = log_file
+
     try:
 
-        # Logginh interaction details
+        # Logging interaction details
 
         print(f"Received command from {interaction.user}")
         print(f"Location: {location_name}")
         print(f"Target: {target_name}")
         print(f"Minimum Observation Minutes: {minimum_observation_minutes}")
-        print(f"Min Altitude: {min_altitude}")
-        print(f"Max Altitude: {max_altitude}")
-        print(f"Moon Separation: {moon_separation}")
-        print(f"Moon Illumination: {moon_illumination}")
+        print(f"Minimum Altitude: {minimum_altitude}")
+        print(f"Maximum Altitude: {maximum_altitude}")
+        print(f"Minimum Moon Separation: {minimum_moon_separation}")
+        print(f"Maximum Moon Illumination: {maximum_moon_illumination}")
 
         # Create observer and target objects
         observer = AstroObserver()
@@ -64,30 +79,30 @@ async def astroplan(
 
         # Add altitude constraints
         try:
-            min_altitude = float(min_altitude)
-            max_altitude = float(max_altitude)
+            minimum_altitude = float(minimum_altitude)
+            maximum_altitude = float(maximum_altitude)
 
-            values = (min_altitude, max_altitude)
+            values = (minimum_altitude, maximum_altitude)
             target.add_constraint('altitude', values)
-            print(f"Altitude constraints set to min: {min_altitude}, max: {max_altitude}")
+            print(f"Altitude constraints set to min: {minimum_altitude}, max: {maximum_altitude}")
         except ValueError:
             await interaction.response.send_message("Invalid minimum altitude constraint. Use a single value (e.g., 30).")
             return
      
         # add moon separation and illumination constraints
         try:
-            values = (float(moon_separation),)
+            values = (float(minimum_moon_separation),)
             target.add_constraint('moon_separation', values)
-            print(f"Moon separation constraint set to {moon_separation} degrees")
+            print(f"Moon separation constraint set to {minimum_moon_separation} degrees")
         except ValueError:
             await interaction.response.send_message("Invalid moon separation constraint. Use a single value (e.g., 15).")
             return
 
         
         try:
-            values = (float(moon_illumination),)
+            values = (float(maximum_moon_illumination),)
             target.add_constraint('moon_illumination', values)
-            print(f"Moon illumination constraint set to {moon_illumination}")
+            print(f"Moon illumination constraint set to {maximum_moon_illumination}")
         except ValueError:
             await interaction.response.send_message("Invalid moon illumination constraint. Use a single value (e.g., 0.5).")
             return
@@ -101,55 +116,173 @@ async def astroplan(
 
         for day in range(30):
             date = today + timedelta(days=day)
+            date_str = date.strftime('%Y-%m-%d')
             print(f"Calculating observation window for {date}")
 
             observation_window = target.get_observation_window(observer, date)
-
             if observation_window['is_observable']:
-                date_str = date.strftime('%Y-%m-%d')
                 start_str = observation_window['start_str']
                 end_str = observation_window['end_str']
                 minutes = observation_window['observable_time_str']
                 lines.append(f"{date_str:<11} {start_str:<15} {end_str:<15} {minutes:<7}")
             else:
-                date_str = date.strftime('%Y-%m-%d')
-                broken_constraints = observation_window.get('broken_constraints', [])
-                lines.append(f"{date_str:<11} {broken_constraints}")
+                
+                lines.append(f"{date_str:<11} {'-':<15} {'-':<15} {'0 min':<7}")
 
         table = "```\n" + "\n".join(lines) + "\n```"   
 
-        print("Sending response")
-        await interaction.followup.send(f"Observer Location: {observer.location_name}\n"
+        full_response = (f"Observer Location: {observer.location_name}\n"
                         f"Target: {target.pretty_name}\n"
                         f"Minimum Observation Time: {minimum_observation_minutes} minutes\n"
-                        f"Altitude: {min_altitude} to {max_altitude} degrees\n"
-                        f"Minimum Moon Separation: {moon_separation} degrees\n"
-                        f"Maximum Moon Illumination: {int(float(moon_illumination)*100)}%\n\n"
+                        f"Altitude: {minimum_altitude} to {maximum_altitude} degrees\n"
+                        f"Minimum Moon Separation: {minimum_moon_separation} degrees\n"
+                        f"Maximum Moon Illumination: {int(float(maximum_moon_illumination))}%\n\n"
                         f"Observation Windows:\n{table}")
+
+        print("Sending response")
+        print(full_response)
+        await interaction.followup.send(full_response)
+
+    
     except Exception as e:
         await interaction.response.send_message(f"Error: {str(e)}")
 
-# Define a help command
-@bot.tree.command(name="astroplan_help", description="Get help information about the bot")
+    finally:
+        # Restore original stdout and close log file
+        sys.stdout = console
+        log_file.close()
+        print(f"Log saved to {log_filename}")
+
+# Define astro_target_window help command
+@bot.tree.command(name="astro_target_window_help", description="Get help information about the bot")
 async def help_command(interaction: discord.Interaction):
     help_text = (
-        "AstroPlan Bot Commands:\n"
-        "/astroplan location_name:<location> target_name:<target> [minimum_observation_minutes:<minutes>] "
-        "[min_altitude:<degrees>] [max_altitude:<degrees>] [moon_separation:<degrees>] [moon_illumination:<value>]\n\n"
+        "astro_target_window Bot Commands:\n"
+        "/astro_target_window location_name:<location> target_name:<target> [minimum_observation_minutes:<minutes>] "
+        "[minimum_altitude:<degrees>] [maximum_altitude:<degrees>] [minimum_moon_separation:<degrees>] [maximum_moon_illumination:<value>]\n\n"
         "Parameters:\n"
         "- location_name: Name of the observer's location (e.g., 'New York, USA')\n"
         "- target_name: Name of the astronomical target (e.g., 'M31')\n"
         "- minimum_observation_minutes: Minimum required observation time in minutes (default: 120)\n"
-        "- min_altitude: Minimum altitude constraint in degrees (default: 0.0)\n"
-        "- max_altitude: Maximum altitude constraint in degrees (default: 90.0)\n"
-        "- moon_separation: Minimum angular separation from the Moon in degrees (default: 0.0)\n"
-        "- moon_illumination: Maximum Moon illumination fraction (0.0 to 1.0, default: 1.0)\n\n"
+        "- minimum_altitude: Minimum altitude constraint in degrees (default: 0.0)\n"
+        "- maximum_altitude: Maximum altitude constraint in degrees (default: 90.0)\n"
+        "- minimum_moon_separation: Minimum angular separation from the Moon in degrees (default: 0.0)\n"
+        "- maximum_moon_illumination: Maximum Moon illumination percennt (0 to 100, default: 100)\n\n"
         "Example:\n"
-        "/astroplan location_name:'New York, USA' target_name:'M31' minimum_observation_minutes:'60' "
-        "min_altitude:'30' max_altitude:'80' moon_separation:'15' moon_illumination:'0.5'\n\n"
+        "/astro_target_window location_name:'New York, USA' target_name:'M31' minimum_observation_minutes:'60' "
+        "minimum_altitude:'30' maximum_altitude:'80' minimum_moon_separation:'15' maximum_moon_illumination:'0.5'\n\n"
         "Use /help to see this message again."
     )
     await interaction.response.send_message(help_text)
+
+#Define best_tonight command
+@bot.tree.command(name="best_tonight", description="Get the best target to observe tonight from a location")
+async def best_tonight(
+    interaction: discord.Interaction,
+    location_name: str
+    ):
+    
+    await interaction.response.defer()
+
+    # start a log file for this interaction
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    username = interaction.user.name.replace(" ", "_")
+    log_filename = f"logs/best_tonight_{timestamp}_{username}.log"
+    log_file = open(log_filename, "a", encoding="utf-8")
+    console = sys.stdout  # Save the current stdout to restore later
+    sys.stdout = log_file
+
+    try:
+        # Logginh interaction details
+
+        print(f"Received command from {interaction.user}")
+        print(f"Location: {location_name}")
+
+        # Create observer object
+        observer = AstroObserver()
+        observer.get_location(location_name=location_name)
+        print(f"Observer created: {observer}")
+
+        # load targets from csv file into list
+        # target,type
+        with open('data/targets.csv', 'r', encoding='utf-8') as f:
+            reader = csv.reader(f)
+            target_list = list(reader)
+        
+
+        observerable_targets = []
+
+        for target in target_list:
+            target_name = target[0]
+            target_type = target[1]
+
+            # create target object
+            astro_target = AstroTarget()
+            target.resolve_target_from_name(name=target_name)
+            print(f"Target created: {target.pretty_name}")
+
+            # Minimum 20 dec altitude
+            astro_target.add_constraint('altitude', (20.0, 90.0))
+
+            # Minimum 45 dec moon separation
+            astro_target.add_constraint('moon_separation', (45.0,))
+
+            # Minimum 60 minutes observation time
+            astro_target.set_minimum_observation_minutes(60)
+
+            # Calculate observation window for tonight
+            tonight = datetime.now().date() 
+            observation_window = astro_target.get_observation_window(observer, tonight)
+
+            if observation_window['is_observable']:
+                observerable_targets.append((astro_target.pretty_name, target_type, observation_window['observable_time_minutes'], observation_window['start_str'], observation_window['end_str']))
+                print(f"Target {astro_target.pretty_name} is observable for {observation_window['observable_time_minutes']} minutes")
+        
+        # Sort observable targets by observation time
+        observerable_targets.sort(key=lambda x: x[2], reverse=True)
+
+        if len(observerable_targets) == 0:
+            await interaction.followup.send(f"No observable targets found for {observer.location_name} tonight.")
+            return
+        
+        # Create response message
+        lines = [
+            f"Best Observable Targets for Tonight ({tonight.strftime('%Y-%m-%d')}):\n",
+            f"Observer Location: {observer.location_name}\n",
+            "Target Name         Type        Minutes   Start Time      End Time",
+            "------------------  ----------  -------   --------------- ---------------"
+        ]
+
+        for target in observerable_targets:
+            lines.append(f"{target[0]:<18} {target[1]:<10} {target[2]:<9} {target[3]:<15} {target[4]:<15}")
+        
+        table = "```\n" + "\n".join(lines) + "\n```"
+        await interaction.followup.send(table)
+
+    except Exception as e:
+        await interaction.response.send_message(f"Error: {str(e)}")
+
+    finally:
+        # Restore original stdout and close log file
+        sys.stdout = console
+        log_file.close()
+        print(f"Log saved to {log_filename}")
+        
+
+# Define best_tonight help command
+@bot.tree.command(name="best_tonight_help", description="Get help information about the best_tonight command")
+async def best_tonight_help_command(interaction: discord.Interaction):
+    help_text = (
+        "best_tonight Bot Command:\n"
+        "/best_tonight location_name:<location>\n\n"
+        "Parameters:\n"
+        "- location_name: Name of the observer's location (e.g., 'New York, USA')\n\n"
+        "Example:\n"
+        "/best_tonight location_name:'New York, USA'\n\n"
+        "Use /best_tonight_help to see this message again."
+    )
+    await interaction.response.send_message(help_text)
+
 
 # Run the bot
 if __name__ == "__main__":

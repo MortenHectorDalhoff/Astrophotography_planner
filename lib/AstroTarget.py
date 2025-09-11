@@ -196,16 +196,10 @@ class AstroTarget:
                                          time_resolution=10 * u.minute)
         
         # Check if the target is observable at each time in the grid
-        constraint_masks = [
-            constraint(observer.get_observer(), [self.astroplan_target], times=time_grid)  # One array of booleans per constraint
-            for constraint in self.constraints
-        ]
-        
-        # Track which constraints are broken
-        broken_constraints = []
-        for i, mask in enumerate(constraint_masks):
-            if not mask.any():  # If all values are False, constraint is broken
-                broken_constraints.append(type(self.constraints[i]).__name__)
+        constraint_masks = []
+        for constraint in self.constraints:
+            constraint_result = constraint(observer.get_observer(), [self.astroplan_target], times=time_grid)
+            constraint_masks.append(constraint_result)
 
         # Combine the masks from all constraints
         combined_mask = constraint_masks[0]
@@ -245,7 +239,6 @@ class AstroTarget:
         return_dict['end_str'] = self._format_time(observation_window_end)
         return_dict['observable_minutes'] = target_observable_minutes
         return_dict['observable_time_str'] = self._minutes_to_time_str(target_observable_minutes)
-        return_dict['broken_constraints'] = broken_constraints
         
         return return_dict
 
