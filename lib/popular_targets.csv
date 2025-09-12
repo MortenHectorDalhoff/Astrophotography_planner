@@ -1,80 +1,27 @@
-target,type
 M1,Nebular
-M2,Cluster
-M3,Cluster
-M4,Cluster
-M5,Cluster
-M6,Cluster
-M7,Cluster
 M8,Nebular
-M9,Cluster
-M10,Cluster
-M11,Cluster
-M12,Cluster
-M13,Cluster
-M14,Cluster
-M15,Cluster
 M16,Nebular
 M17,Nebular
-M18,Cluster
-M19,Cluster
 M20,Nebular
-M21,Cluster
-M22,Cluster
-M23,Cluster
-M24,Cluster
-M25,Cluster
-M26,Cluster
 M27,Nebular
-M28,Cluster
-M29,Cluster
-M30,Cluster
 M31,Galaxy
 M32,Galaxy
 M33,Galaxy
-M34,Cluster
-M35,Cluster
-M36,Cluster
-M37,Cluster
-M38,Cluster
-M39,Cluster
-M41,Cluster
 M42,Nebular
 M43,Nebular
-M44,Cluster
-M45,Cluster
-M46,Cluster
-M47,Cluster
-M48,Cluster
 M49,Galaxy
-M50,Cluster
 M51,Galaxy
-M52,Cluster
-M53,Cluster
-M54,Cluster
-M55,Cluster
-M56,Cluster
 M58,Galaxy
 M59,Galaxy
 M60,Galaxy
 M61,Galaxy
-M62,Cluster
 M63,Galaxy
 M64,Galaxy
 M65,Galaxy
 M66,Galaxy
-M67,Cluster
-M68,Cluster
-M69,Cluster
-M70,Cluster
-M71,Cluster
-M72,Cluster
 M74,Galaxy
-M75,Cluster
 M77,Galaxy
 M78,Nebular
-M79,Cluster
-M80,Cluster
 M81,Galaxy
 M82,Galaxy
 M83,Galaxy
@@ -85,8 +32,6 @@ M87,Galaxy
 M88,Galaxy
 M90,Galaxy
 M91,Galaxy
-M92,Cluster
-M93,Cluster
 M94,Galaxy
 M95,Galaxy
 M96,Galaxy
@@ -95,60 +40,25 @@ M99,Galaxy
 M100,Galaxy
 M101,Galaxy
 M102,Galaxy
-M103,Cluster
 M104,Galaxy
 M105,Galaxy
 M106,Galaxy
-M107,Cluster
 M108,Galaxy
 M109,Galaxy
 M110,Galaxy
 NGC 55,Galaxy
-NGC 129,Cluster
 NGC 185,Galaxy
 NGC 247,Galaxy
 NGC 253,Galaxy
 NGC 281,Nebular
-NGC 288,Cluster
 NGC 346,Nebular
-NGC 362,Cluster
-NGC 6025,Cluster
-NGC 6134,Cluster
-NGC 6193,Cluster
-NGC 6231,Cluster
 NGC 6334,Nebular
-NGC 6352,Cluster
 NGC 6357,Nebular
-NGC 6362,Cluster
-NGC 6397,Cluster
-NGC 6530,Cluster
-NGC 6544,Cluster
-NGC 6553,Cluster
-NGC 6569,Cluster
-NGC 6584,Cluster
-NGC 6590,Cluster
-NGC 6604,Cluster
-NGC 6624,Cluster
-NGC 6633,Cluster
-NGC 6637,Cluster
-NGC 6642,Cluster
-NGC 6652,Cluster
-NGC 6681,Cluster
-NGC 6712,Cluster
-NGC 6723,Cluster
+NGC 6652,Cluster 
 NGC 6744,Galaxy
-NGC 6752,Cluster
-NGC 6774,Cluster
-NGC 6811,Cluster
-NGC 6819,Cluster
 NGC 6822,Galaxy
-NGC 6823,Cluster
-NGC 6830,Cluster
-NGC 6834,Cluster
 NGC 6853,Nebular
-NGC 6871,Cluster
 NGC 6888,Nebular
-NGC 6910,Cluster
 NGC 6946,Galaxy
 NGC 6960,Nebular
 NGC 6974,Nebular
@@ -157,36 +67,48 @@ NGC 6992,Nebular
 NGC 6995,Nebular
 NGC 7000,Nebular
 NGC 7023,Nebular
-NGC 7031,Cluster
-NGC 7044,Cluster
-NGC 7062,Cluster
 NGC 7129,Nebular
-NGC 7142,Cluster
-NGC 7160,Cluster
-NGC 7175,Cluster
-NGC 7209,Cluster
-NGC 7235,Cluster
-NGC 7243,Cluster
 NGC 7293,Nebular
 NGC 7331,Galaxy
 NGC 7380,Nebular
-NGC 752,Cluster
-NGC 7789,Cluster
 NGC 7793,Galaxy
 NGC 2403,Galaxy
 NGC 2903,Galaxy
-NGC 3114,Cluster
 NGC 3372,Nebular
-NGC 3532,Cluster
-NGC 4755,Cluster
 NGC 4945,Galaxy
-NGC 5139,Cluster
-NGC 6604,Cluster
 NGC 6822,Galaxy
 NGC 7635,Nebular
 NGC 4631,Galaxy
 NGC 4565,Galaxy
 NGC 3521,Galaxy
-IC 2391,Cluster
-IC 2602,Cluster
 IC 2944,Nebular
+M2,Cluster
+M3,Cluster
+M4,Cluster
+M5,Cluster
+M6,Cluster
+M7,Cluster
+M11,Cluster
+M13,Cluster
+M15,Cluster
+M22,Cluster
+M35,Cluster
+M36,Cluster
+M37,Cluster
+M38,Cluster
+M41,Cluster
+M44,Cluster
+M45,Cluster
+M46,Cluster
+M47,Cluster
+M50,Cluster
+M52,Cluster
+M53,Cluster
+M67,Cluster
+M71,Cluster
+M92,Cluster
+M93,Cluster
+M103,Cluster
+NGC 362,Cluster
+NGC 6231,Cluster
+NGC 6397,Cluster

@@ -131,7 +131,10 @@ async def astro_target_window(
 
         table = "```\n" + "\n".join(lines) + "\n```"   
 
-        full_response = (f"Observer Location: {observer.location_name}\n"
+        user_mention = f"<@{interaction.user.id}>"
+
+        full_response = (f"{user_mention}\n\n"
+                        f"Observer Location: {observer.location_name}\n"
                         f"Target: {target.pretty_name}\n"
                         f"Minimum Observation Time: {minimum_observation_minutes} minutes\n"
                         f"Altitude: {minimum_altitude} to {maximum_altitude} degrees\n"
@@ -145,7 +148,8 @@ async def astro_target_window(
 
     
     except Exception as e:
-        await interaction.response.send_message(f"Error: {str(e)}")
+        await interaction.followup.send(f"Error: {str(e)}")
+        print(f"Error: {str(e)}")
 
     finally:
         # Restore original stdout and close log file
@@ -205,7 +209,7 @@ async def best_tonight(
 
         # load targets from csv file into list
         # target,type
-        with open('data/targets.csv', 'r', encoding='utf-8') as f:
+        with open('lib/popular_targets.csv', 'r', encoding='utf-8') as f:
             reader = csv.reader(f)
             target_list = list(reader)
         
@@ -216,10 +220,12 @@ async def best_tonight(
             target_name = target[0]
             target_type = target[1]
 
+            print(f"Processing target: {target_name} ({target_type})")
+
             # create target object
             astro_target = AstroTarget()
-            target.resolve_target_from_name(name=target_name)
-            print(f"Target created: {target.pretty_name}")
+            astro_target.resolve_target_from_name(name=target_name)
+            print(f"Target created: {astro_target.pretty_name}")
 
             # Minimum 20 dec altitude
             astro_target.add_constraint('altitude', (20.0, 90.0))
@@ -235,8 +241,8 @@ async def best_tonight(
             observation_window = astro_target.get_observation_window(observer, tonight)
 
             if observation_window['is_observable']:
-                observerable_targets.append((astro_target.pretty_name, target_type, observation_window['observable_time_minutes'], observation_window['start_str'], observation_window['end_str']))
-                print(f"Target {astro_target.pretty_name} is observable for {observation_window['observable_time_minutes']} minutes")
+                observerable_targets.append((astro_target.pretty_name, target_type, observation_window['observable_time_str'], observation_window['start_str'], observation_window['end_str']))
+                print(f"Target {astro_target.pretty_name} is observable for {observation_window['observable_time_str']}")
         
         # Sort observable targets by observation time
         observerable_targets.sort(key=lambda x: x[2], reverse=True)
@@ -246,21 +252,59 @@ async def best_tonight(
             return
         
         # Create response message
-        lines = [
-            f"Best Observable Targets for Tonight ({tonight.strftime('%Y-%m-%d')}):\n",
-            f"Observer Location: {observer.location_name}\n",
-            "Target Name         Type        Minutes   Start Time      End Time",
-            "------------------  ----------  -------   --------------- ---------------"
+        print_Nebular = False
+        Nebular_table = [
+            "Target Name                      Type        Minutes   Start Time      End Time",
+            "------------------------------   ----------  -------   --------------- --------------"
         ]
-
-        for target in observerable_targets:
-            lines.append(f"{target[0]:<18} {target[1]:<10} {target[2]:<9} {target[3]:<15} {target[4]:<15}")
         
-        table = "```\n" + "\n".join(lines) + "\n```"
-        await interaction.followup.send(table)
+        print_galaxy = False
+        galaxy_table = [
+            "Target Name                      Type        Minutes   Start Time      End Time",
+            "------------------------------   ----------  -------   --------------- --------------"
+        ]
+        
+        print_cluster = False
+        cluster_table = [
+            "Target Name                      Type        Minutes   Start Time      End Time",
+            "------------------------------   ----------  -------   --------------- --------------"
+        ]
+        
+        # Show top 10 targets
+        for target in observerable_targets:
+            target_name = target[0]
+            target_type = target[1]
+            targert_minutes = target[2]
+            target_start = target[3]
+            target_end = target[4]
+
+            if target_type == 'Nebular':
+                print_Nebular = True
+                Nebular_table.append(f"{target_name:<30} {target_type:<10} {targert_minutes:<9} {target_start:<15} {target_end:<15}")
+
+            elif target_type == 'Galaxy':
+                print_galaxy = True
+                galaxy_table.append(f"{target_name:<30} {target_type:<10} {targert_minutes:<9} {target_start:<15} {target_end:<15}")
+
+            elif target_type == 'Cluster':
+                print_cluster = True
+                cluster_table.append(f"{target_name:<30} {target_type:<10} {targert_minutes:<9} {target_start:<15} {target_end:<15}")
+        
+        user_mention = f"<@{interaction.user.id}>"
+
+        if print_Nebular:
+            Nebular_message = f"{user_mention}\n```\n" + "\n".join(Nebular_table) + "\n```"
+            await interaction.followup.send(Nebular_message)
+        if print_galaxy:
+            galaxy_message = f"{user_mention}\n```\n" + "\n".join(galaxy_table) + "\n```"
+            await interaction.followup.send(galaxy_message)
+        if print_cluster:
+            cluster_message = f"{user_mention}\n```\n" + "\n".join(cluster_table) + "\n```"
+            await interaction.followup.send(cluster_message)
 
     except Exception as e:
-        await interaction.response.send_message(f"Error: {str(e)}")
+        await interaction.followup.send(f"Error: {str(e)}")
+        print(f"Error: {str(e)}")
 
     finally:
         # Restore original stdout and close log file
